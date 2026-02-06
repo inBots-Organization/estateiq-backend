@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trainee {
+  id                   String                   @id @default(uuid())
+  email                String                   @unique
+  firstName            String                   @map("first_name")
+  lastName             String                   @map("last_name")
+  organizationId       String                   @map("organization_id")
+  currentLevelId       String?                  @map("current_level_id")
+  role                 String                   @default("trainee")
+  passwordHash         String                   @map("password_hash")
+  passwordChangedAt    DateTime?                @map("password_changed_at")
+  totalTimeOnPlatform  Int                      @default(0) @map("total_time_on_platform")
+  currentStreak        Int                      @default(0) @map("current_streak")
+  lastActiveAt         DateTime?                @map("last_active_at")
+  status               String                   @default("active")
+  suspendedAt          DateTime?                @map("suspended_at")
+  suspendedBy          String?                  @map("suspended_by")
+  suspensionReason     String?                  @map("suspension_reason")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  completedAssessments AssessmentCompletion[]
+  groupMemberships     GroupMember[]
+  interactionReports   InteractionReport[]
+  completedLectures    LectureCompletion[]
+  notifications        Notification[]
+  enrollments          ProgramEnrollment[]
+  simulationSessions   SimulationSession[]
+  notesWritten         TraineeNote[]            @relation("NoteAuthor")
+  notesReceived        TraineeNote[]            @relation("NoteSubject")
+  currentLevel         Level?                   @relation(fields: [currentLevelId], references: [id])
+  organization         Organization             @relation(fields: [organizationId], references: [id])
+  trainerAssignments   TrainerGroupAssignment[]
+
+  @@map("trainees")
+}
+
+model Course {
+  id                       String    @id @default(uuid())
+  programId                String    @map("program_id")
+  levelId                  String    @map("level_id")
+  title                    String
+  description              String
+  objectives               String    @default("[]")
+  prerequisites            String    @default("[]")
+  estimatedDurationMinutes Int       @map("estimated_duration_minutes")
+  difficulty               String
+  category                 String
+  isPublished              Boolean   @default(false) @map("is_published")
+  orderInLevel             Int       @map("order_in_level")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+  level                    Level     @relation(fields: [levelId], references: [id])
+  program                  Program   @relation(fields: [programId], references: [id])
+  lectures                 Lecture[]
+
+  @@map("courses")
+}
+
+model Lecture {
+  id                          String              @id @default(uuid())
+  courseId                    String              @map("course_id")
+  title                       String
+  description                 String
+  videoUrl                    String              @map("video_url")
+  durationMinutes             Int                 @map("duration_minutes")
+  orderInCourse               Int                 @map("order_in_course")
+  triggerAssessmentOnComplete Boolean             @default(true) @map("trigger_assessment_on_complete")
+  createdAt                   DateTime            @default(now()) @map("created_at")
+  updatedAt                   DateTime            @updatedAt @map("updated_at")
+  completions                 LectureCompletion[]
+  course                      Course              @relation(fields: [courseId], references: [id])
+
+  @@map("lectures")
+}
+
+model SimulationSession {
+  id                String             @id @default(uuid())
+  traineeId         String             @map("trainee_id")
+  scenarioType      String             @map("scenario_type")
+  difficultyLevel   String             @map("difficulty_level")
+  status            String             @default("scheduled")
+  clientPersona     String             @map("client_persona")
+  startedAt         DateTime?          @map("started_at")
+  completedAt       DateTime?          @map("completed_at")
+  durationSeconds   Int?               @map("duration_seconds")
+  recordingUrl      String?            @map("recording_url")
+  metrics           String?
+  outcome           String?
+  createdAt         DateTime           @default(now()) @map("created_at")
+  conversationTurns ConversationTurn[]
+  interactionReport InteractionReport?
+  trainee           Trainee            @relation(fields: [traineeId], references: [id])
+
+  @@map("simulation_sessions")
+}
+
+model ConversationTurn {
+  id             String            @id @default(uuid())
+  sessionId      String            @map("session_id")
+  speaker        String
+  message        String
+  timestamp      DateTime          @default(now())
+  sentiment      String?
+  detectedIntent String?           @map("detected_intent")
+  turnNumber     Int               @map("turn_number")
+  session        SimulationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_turns")
+}
+
+model InteractionReport {
+  id                 String            @id @default(uuid())
+  traineeId          String            @map("trainee_id")
+  reportType         String            @map("report_type")
+  sourceType         String            @map("source_type")
+  sourceId           String            @unique @map("source_id")
+  generatedAt        DateTime          @default(now()) @map("generated_at")
+  summary            String
+  strengths          String            @default("[]")
+  weaknesses         String            @default("[]")
+  knowledgeGaps      String            @default("[]") @map("knowledge_gaps")
+  recommendations    String            @default("[]")
+  suggestedNextSteps String            @default("[]") @map("suggested_next_steps")
+  progressSummary    String?           @map("progress_summary")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  simulationSession  SimulationSession @relation(fields: [sourceId], references: [id])
+  trainee            Trainee           @relation(fields: [traineeId], references: [id])
+
+  @@map("interaction_reports")
+}
+
+model Organization {
+  id               String         @id @default(uuid())
+  name             String
+  type             String
+  contactEmail     String?        @map("contact_email")
+  phone            String?
+  address          String?
+  logoUrl          String?        @map("logo_url")
+  settings         String         @default("{}")
+  status           String         @default("active") // active, suspended, blocked
+  suspendedAt      DateTime?      @map("suspended_at")
+  suspendedBy      String?        @map("suspended_by")
+  suspensionReason String?        @map("suspension_reason")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  groups           TraineeGroup[]
+  trainees         Trainee[]
+  subscription     Subscription?
+  apiUsage         ApiUsage[]
+
+  @@map("organizations")
+}
+
+model Program {
+  id          String              @id @default(uuid())
+  title       String
+  description String
+  isActive    Boolean             @default(true) @map("is_active")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  courses     Course[]
+  levels      Level[]
+  enrollments ProgramEnrollment[]
+
+  @@map("programs")
+}
+
+model Level {
+  id             String    @id @default(uuid())
+  programId      String    @map("program_id")
+  title          String
+  orderInProgram Int       @map("order_in_program")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  courses        Course[]
+  program        Program   @relation(fields: [programId], references: [id])
+  trainees       Trainee[]
+
+  @@map("levels")
+}
+
+model ProgramEnrollment {
+  id          String    @id @default(uuid())
+  traineeId   String    @map("trainee_id")
+  programId   String    @map("program_id")
+  enrolledAt  DateTime  @default(now()) @map("enrolled_at")
+  completedAt DateTime? @map("completed_at")
+  program     Program   @relation(fields: [programId], references: [id])
+  trainee     Trainee   @relation(fields: [traineeId], references: [id])
+
+  @@unique([traineeId, programId])
+  @@map("program_enrollments")
+}
+
+model LectureCompletion {
+  id               String   @id @default(uuid())
+  traineeId        String   @map("trainee_id")
+  lectureId        String   @map("lecture_id")
+  completedAt      DateTime @default(now()) @map("completed_at")
+  timeSpentMinutes Int      @map("time_spent_minutes")
+  lecture          Lecture  @relation(fields: [lectureId], references: [id])
+  trainee          Trainee  @relation(fields: [traineeId], references: [id])
+
+  @@unique([traineeId, lectureId])
+  @@map("lecture_completions")
+}
+
+model AssessmentCompletion {
+  id           String   @id @default(uuid())
+  traineeId    String   @map("trainee_id")
+  assessmentId String   @map("assessment_id")
+  score        Float
+  completedAt  DateTime @default(now()) @map("completed_at")
+  trainee      Trainee  @relation(fields: [traineeId], references: [id])
+
+  @@unique([traineeId, assessmentId])
+  @@map("assessment_completions")
+}
+
+model VoiceSession {
+  id              String   @id @default(uuid())
+  traineeId       String   @map("trainee_id")
+  conversationId  String   @unique @map("conversation_id")
+  startTime       DateTime @map("start_time")
+  endTime         DateTime @map("end_time")
+  durationSeconds Int      @map("duration_seconds")
+  transcript      String
+  analysis        String?
+  overallScore    Int?     @map("overall_score")
+  audioBase64     String?  @map("audio_base64")
+  status          String   @default("completed")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("voice_sessions")
+}
+
+model ObjectionTemplate {
+  id                String   @id @default(uuid())
+  scenarioType      String   @map("scenario_type")
+  category          String
+  severity          String
+  coreContent       String   @map("core_content")
+  variations        String   @default("[]")
+  triggerConditions String   @default("[]") @map("trigger_conditions")
+  idealResponses    String   @default("[]") @map("ideal_responses")
+  commonMistakes    String   @default("[]") @map("common_mistakes")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("objection_templates")
+}
+
+model TraineeGroup {
+  id                 String                   @id @default(uuid())
+  organizationId     String                   @map("organization_id")
+  name               String
+  description        String?
+  isActive           Boolean                  @default(true) @map("is_active")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  createdById        String                   @map("created_by_id")
+  members            GroupMember[]
+  organization       Organization             @relation(fields: [organizationId], references: [id])
+  trainerAssignments TrainerGroupAssignment[]
+
+  @@unique([organizationId, name])
+  @@map("trainee_groups")
+}
+
+model GroupMember {
+  id        String       @id @default(uuid())
+  groupId   String       @map("group_id")
+  traineeId String       @map("trainee_id")
+  joinedAt  DateTime     @default(now()) @map("joined_at")
+  isActive  Boolean      @default(true) @map("is_active")
+  trainee   Trainee      @relation(fields: [traineeId], references: [id], onDelete: Cascade)
+  group     TraineeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, traineeId])
+  @@map("group_members")
+}
+
+model TrainerGroupAssignment {
+  id           String       @id @default(uuid())
+  groupId      String       @map("group_id")
+  trainerId    String       @map("trainer_id")
+  assignedAt   DateTime     @default(now()) @map("assigned_at")
+  assignedById String       @map("assigned_by_id")
+  isActive     Boolean      @default(true) @map("is_active")
+  trainer      Trainee      @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  group        TraineeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, trainerId])
+  @@map("trainer_group_assignments")
+}
+
+model TraineeNote {
+  id        String   @id @default(uuid())
+  traineeId String   @map("trainee_id")
+  authorId  String   @map("author_id")
+  content   String
+  noteType  String   @default("general") @map("note_type")
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  author    Trainee  @relation("NoteAuthor", fields: [authorId], references: [id])
+  trainee   Trainee  @relation("NoteSubject", fields: [traineeId], references: [id], onDelete: Cascade)
+
+  @@index([traineeId, authorId])
+  @@map("trainee_notes")
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  recipientId String    @map("recipient_id")
+  senderId    String?   @map("sender_id")
+  type        String
+  title       String
+  message     String
+  priority    String    @default("normal")
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  recipient   Trainee   @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead])
+  @@map("notifications")
+}
+
+// ==========================================
+// SaaS Super Admin Models
+// ==========================================
+
+model SubscriptionPlan {
+  id                String         @id @default(uuid())
+  name              String         @unique
+  displayName       String         @map("display_name")
+  description       String?
+  monthlyPrice      Float          @map("monthly_price")
+  annualPrice       Float?         @map("annual_price")
+  seatLimit         Int?           @map("seat_limit")
+  simulationLimit   Int?           @map("simulation_limit")
+  voiceMinutesLimit Int?           @map("voice_minutes_limit")
+  features          String         @default("[]")
+  isActive          Boolean        @default(true) @map("is_active")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  subscriptions     Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                 String           @id @default(uuid())
+  organizationId     String           @unique @map("organization_id")
+  planId             String           @map("plan_id")
+  status             String           @default("active") // active, suspended, expired, cancelled, trial
+  billingCycle       String           @default("monthly") @map("billing_cycle")
+  currentPeriodStart DateTime         @map("current_period_start")
+  currentPeriodEnd   DateTime         @map("current_period_end")
+  cancelledAt        DateTime?        @map("cancelled_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  organization       Organization     @relation(fields: [organizationId], references: [id])
+  plan               SubscriptionPlan @relation(fields: [planId], references: [id])
+  invoices           Invoice[]
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String       @id @default(uuid())
+  subscriptionId String       @map("subscription_id")
+  invoiceNumber  String       @unique @map("invoice_number")
+  amount         Float
+  currency       String       @default("USD")
+  status         String       @default("pending") // pending, paid, failed, refunded
+  periodStart    DateTime     @map("period_start")
+  periodEnd      DateTime     @map("period_end")
+  paidAt         DateTime?    @map("paid_at")
+  dueDate        DateTime     @map("due_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("invoices")
+}
+
+model ApiUsage {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  provider       String // elevenlabs, gemini, claude
+  endpoint       String
+  tokensUsed     Int?         @map("tokens_used")
+  durationMs     Int?         @map("duration_ms")
+  cost           Float?
+  usageDate      DateTime     @map("usage_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, usageDate])
+  @@map("api_usage")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String   @map("actor_id")
+  actorEmail String   @map("actor_email")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  details    String   @default("{}")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

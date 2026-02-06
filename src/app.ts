@@ -1,0 +1,107 @@
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { container } from 'tsyringe';
+
+// Import controllers
+import { SimulationController } from './controllers/simulation.controller';
+import { TraineeController } from './controllers/trainee.controller';
+import { ReportController } from './controllers/report.controller';
+import { CourseController } from './controllers/course.controller';
+import { AuthController } from './controllers/auth.controller';
+import { ElevenLabsController } from './controllers/elevenlabs.controller';
+import { VoiceController } from './controllers/voice.controller';
+import { AITeacherController } from './controllers/ai-teacher.controller';
+
+// Import routes
+import adminRoutes from './routes/admin.routes';
+import groupRoutes from './routes/group.routes';
+import notesRoutes from './routes/notes.routes';
+import notificationsRoutes from './routes/notifications.routes';
+import settingsRoutes from './routes/settings.routes';
+import superAdminRoutes from './routes/super-admin.routes';
+
+// Import middleware
+import { errorHandler } from './middleware/error-handler.middleware';
+
+const app: Application = express();
+
+// Security middleware
+app.use(helmet());
+// Allow all localhost origins in development
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "http://167.86.97.76:3000"
+      ];
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
+
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// API routes
+const apiRouter = express.Router();
+
+// Register controllers
+const simulationController = container.resolve(SimulationController);
+const traineeController = container.resolve(TraineeController);
+const reportController = container.resolve(ReportController);
+const courseController = container.resolve(CourseController);
+const authController = container.resolve(AuthController);
+const elevenLabsController = container.resolve(ElevenLabsController);
+const voiceController = container.resolve(VoiceController);
+const aiTeacherController = container.resolve(AITeacherController);
+
+apiRouter.use('/auth', authController.router);
+apiRouter.use('/simulations', simulationController.router);
+apiRouter.use('/trainees', traineeController.router);
+apiRouter.use('/reports', reportController.router);
+apiRouter.use('/courses', courseController.router);
+apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/groups', groupRoutes);
+apiRouter.use('/notes', notesRoutes);
+apiRouter.use('/notifications', notificationsRoutes);
+apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/super-admin', superAdminRoutes);
+apiRouter.use('/elevenlabs', elevenLabsController.router);
+apiRouter.use('/voice', voiceController.router);
+apiRouter.use('/ai-teacher', aiTeacherController.router);
+
+app.use('/api', apiRouter);
+
+// 404 handler
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} not found`,
+  });
+});
+
+// Global error handler
+app.use(errorHandler);
+
+export { app };

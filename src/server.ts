@@ -6,39 +6,40 @@ import * as fs from 'fs';
 // Load environment variables first - explicitly from the backend root
 const envPath = resolve(__dirname, '..', '.env');
 
-// Check if file exists
-if (!fs.existsSync(envPath)) {
-  console.error(`[Server] ERROR: .env file not found at ${envPath}`);
-  process.exit(1);
-}
+// Check if file exists - only load .env in development
+if (fs.existsSync(envPath)) {
+  // Read and parse .env file manually to ensure proper loading
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const envLines = envContent.split('\n');
 
-// Read and parse .env file manually to ensure proper loading
-const envContent = fs.readFileSync(envPath, 'utf8');
-const envLines = envContent.split('\n');
+  for (const line of envLines) {
+    const trimmed = line.trim();
+    // Skip comments and empty lines
+    if (!trimmed || trimmed.startsWith('#')) continue;
 
-for (const line of envLines) {
-  const trimmed = line.trim();
-  // Skip comments and empty lines
-  if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex > 0) {
+      const key = trimmed.substring(0, eqIndex).trim();
+      let value = trimmed.substring(eqIndex + 1).trim();
 
-  const eqIndex = trimmed.indexOf('=');
-  if (eqIndex > 0) {
-    const key = trimmed.substring(0, eqIndex).trim();
-    let value = trimmed.substring(eqIndex + 1).trim();
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
 
-    // Remove surrounding quotes if present
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
+      // Set in process.env if not already set (env vars take precedence)
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
     }
-
-    // Set in process.env
-    process.env[key] = value;
   }
-}
 
-// Also run dotenv for compatibility
-const result = config({ path: envPath, override: true });
+  // Also run dotenv for compatibility
+  config({ path: envPath, override: false });
+} else {
+  console.log('[Server] No .env file found, using environment variables');
+}
 
 // Dynamic imports to ensure env is loaded first
 async function startServer() {

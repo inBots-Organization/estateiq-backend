@@ -28,7 +28,7 @@ const app: Application = express();
 
 // Security middleware
 app.use(helmet());
-// Allow all localhost origins in development
+// Allow frontend origins
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -36,10 +36,13 @@ app.use(
 
       const allowedOrigins = [
         "http://localhost:3000",
-        "http://167.86.97.76:3000"
+        "http://167.86.97.76:3000",
+        "https://frontend-inbotsteam.vercel.app",
+        "https://estateiq-app.vercel.app"
       ];
 
-      if (allowedOrigins.includes(origin)) {
+      // Allow any Vercel preview URLs
+      if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 

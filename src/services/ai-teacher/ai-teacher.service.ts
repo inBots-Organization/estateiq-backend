@@ -25,7 +25,7 @@ import {
   SessionNote,
 } from '../interfaces/ai-teacher.interface';
 import { ILLMProvider } from '../../providers/llm/llm-provider.interface';
-import { GeminiLLMProvider } from '../../providers/llm/gemini.provider';
+import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
 
 // Constants
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'trainee-profiles');
@@ -41,14 +41,14 @@ const VOICE_IDS = {
 export class AITeacherService implements IAITeacherService {
   private elevenLabsApiKey: string;
   private sessionCache: Map<string, TeacherSession> = new Map();
-  private geminiProvider: GeminiLLMProvider;
+  private fallbackProvider: FallbackLLMProvider;
 
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient,
     @inject('LLMProvider') private llmProvider: ILLMProvider
   ) {
     this.elevenLabsApiKey = process.env.ELEVENLABS_API_KEY || '';
-    this.geminiProvider = new GeminiLLMProvider();
+    this.fallbackProvider = new FallbackLLMProvider();
     this.ensureProfilesDir();
   }
 
@@ -583,7 +583,7 @@ Write a short, personalized welcome greeting (2-3 sentences only) that:
 
 Be warm and professional.`;
 
-    return this.geminiProvider.complete({
+    return this.fallbackProvider.complete({
       prompt: greetingPrompt,
       maxTokens: 300,
       temperature: 0.7,
@@ -680,7 +680,7 @@ ${lessonContextSection}
 ${attachmentContext}`;
 
     // Generate response using Gemini 2.0 Flash for low-latency
-    const response = await this.geminiProvider.complete({
+    const response = await this.fallbackProvider.complete({
       prompt: message,
       systemPrompt,
       maxTokens: 800,
@@ -767,7 +767,7 @@ ${attachmentContext}`;
 
     try {
       // Stream response using Gemini
-      for await (const chunk of this.geminiProvider.streamComplete({
+      for await (const chunk of this.fallbackProvider.streamComplete({
         prompt: message,
         systemPrompt,
         maxTokens: 800,
@@ -894,7 +894,7 @@ Answer in JSON only:
 }`;
 
     try {
-      const result = await this.geminiProvider.complete({
+      const result = await this.fallbackProvider.complete({
         prompt,
         maxTokens: 300,
         temperature: 0.5,
@@ -1061,7 +1061,7 @@ Respond in JSON only:
 }`;
 
     try {
-      const result = await this.geminiProvider.complete({
+      const result = await this.fallbackProvider.complete({
         prompt,
         maxTokens: 500,
         temperature: 0.3,

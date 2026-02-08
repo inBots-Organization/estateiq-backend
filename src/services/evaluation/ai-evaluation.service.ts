@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
 import { ILLMProvider } from '../../providers/llm/llm-provider.interface';
+import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
 
 export interface ConversationMessage {
   speaker: 'trainee' | 'client';
@@ -57,9 +58,14 @@ export interface IAIEvaluationService {
 
 @injectable()
 export class AIEvaluationService implements IAIEvaluationService {
+  private fallbackProvider: FallbackLLMProvider;
+
   constructor(
     @inject('LLMProvider') private llmProvider: ILLMProvider
-  ) {}
+  ) {
+    // Use fallback provider for faster, more reliable evaluations
+    this.fallbackProvider = new FallbackLLMProvider();
+  }
 
   async evaluateConversation(
     conversation: ConversationMessage[],
@@ -127,10 +133,11 @@ ${transcript}
 Based on this ${conversation.length}-turn conversation, provide your evaluation as JSON:`;
 
     try {
-      const response = await this.llmProvider.complete({
+      // Use fallback provider with reduced tokens for faster response
+      const response = await this.fallbackProvider.complete({
         systemPrompt,
         prompt,
-        maxTokens: 2000,
+        maxTokens: 1500, // Reduced for faster response
         temperature: 0.3, // Lower temperature for more consistent evaluations
         responseFormat: 'json',
       });

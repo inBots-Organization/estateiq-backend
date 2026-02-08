@@ -12,6 +12,7 @@ import { AuthController } from './controllers/auth.controller';
 import { ElevenLabsController } from './controllers/elevenlabs.controller';
 import { VoiceController } from './controllers/voice.controller';
 import { AITeacherController } from './controllers/ai-teacher.controller';
+import { QuizController } from './controllers/quiz.controller';
 
 // Import routes
 import adminRoutes from './routes/admin.routes';
@@ -93,6 +94,9 @@ apiRouter.use('/super-admin', superAdminRoutes);
 apiRouter.use('/elevenlabs', elevenLabsController.router);
 apiRouter.use('/voice', voiceController.router);
 apiRouter.use('/ai-teacher', aiTeacherController.router);
+
+const quizController = container.resolve(QuizController);
+apiRouter.use('/quizzes', quizController.router);
 
 app.use('/api', apiRouter);
 

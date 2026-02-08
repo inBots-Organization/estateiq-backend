@@ -38,6 +38,7 @@ model Trainee {
   currentLevel         Level?                   @relation(fields: [currentLevelId], references: [id])
   organization         Organization             @relation(fields: [organizationId], references: [id])
   trainerAssignments   TrainerGroupAssignment[]
+  quizAttempts         QuizAttempt[]
 
   @@map("trainees")
 }
@@ -60,6 +61,7 @@ model Course {
   level                    Level     @relation(fields: [levelId], references: [id])
   program                  Program   @relation(fields: [programId], references: [id])
   lectures                 Lecture[]
+  quizzes                  Quiz[]
 
   @@map("courses")
 }
@@ -426,4 +428,110 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ==========================================
+// Quiz System Models
+// ==========================================
+
+model Quiz {
+  id                 String         @id @default(uuid())
+  courseId            String?        @map("course_id")
+  organizationId     String?        @map("organization_id")
+  createdById        String         @map("created_by_id")
+  title              String
+  titleAr            String?        @map("title_ar")
+  description        String         @default("")
+  descriptionAr      String?        @map("description_ar")
+  quizType           String         @default("manual") @map("quiz_type")
+  difficulty         String         @default("medium")
+  timeLimit          Int?           @map("time_limit")
+  passingScore       Float          @default(70) @map("passing_score")
+  isPublished        Boolean        @default(false) @map("is_published")
+  shuffleQuestions   Boolean        @default(true) @map("shuffle_questions")
+  showCorrectAnswers Boolean        @default(true) @map("show_correct_answers")
+  maxAttempts        Int?           @map("max_attempts")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  course             Course?        @relation(fields: [courseId], references: [id])
+  questions          Question[]
+  attempts           QuizAttempt[]
+
+  @@index([courseId])
+  @@index([organizationId])
+  @@index([createdById])
+  @@map("quizzes")
+}
+
+model Question {
+  id              String           @id @default(uuid())
+  quizId          String           @map("quiz_id")
+  questionText    String           @map("question_text")
+  questionTextAr  String?          @map("question_text_ar")
+  questionType    String           @default("multiple_choice") @map("question_type")
+  explanation     String?
+  explanationAr   String?          @map("explanation_ar")
+  points          Int              @default(1)
+  orderInQuiz     Int              @map("order_in_quiz")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  quiz            Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options         QuestionOption[]
+  responses       QuizResponse[]
+
+  @@index([quizId])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id              String   @id @default(uuid())
+  questionId      String   @map("question_id")
+  optionText      String   @map("option_text")
+  optionTextAr    String?  @map("option_text_ar")
+  isCorrect       Boolean  @default(false) @map("is_correct")
+  orderInQuestion Int      @map("order_in_question")
+
+  question        Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("question_options")
+}
+
+model QuizAttempt {
+  id               String         @id @default(uuid())
+  quizId           String         @map("quiz_id")
+  traineeId        String         @map("trainee_id")
+  startedAt        DateTime       @default(now()) @map("started_at")
+  completedAt      DateTime?      @map("completed_at")
+  score            Float?
+  totalPoints      Int?           @map("total_points")
+  earnedPoints     Int?           @map("earned_points")
+  passed           Boolean?
+  timeSpentSeconds Int?           @map("time_spent_seconds")
+  status           String         @default("in_progress")
+
+  quiz             Quiz           @relation(fields: [quizId], references: [id])
+  trainee          Trainee        @relation(fields: [traineeId], references: [id])
+  responses        QuizResponse[]
+
+  @@index([quizId, traineeId])
+  @@index([traineeId])
+  @@map("quiz_attempts")
+}
+
+model QuizResponse {
+  id               String      @id @default(uuid())
+  attemptId        String      @map("attempt_id")
+  questionId       String      @map("question_id")
+  selectedOptionId String?     @map("selected_option_id")
+  isCorrect        Boolean     @default(false) @map("is_correct")
+  answeredAt       DateTime    @default(now()) @map("answered_at")
+
+  attempt          QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question         Question    @relation(fields: [questionId], references: [id])
+
+  @@unique([attemptId, questionId])
+  @@map("quiz_responses")
 }

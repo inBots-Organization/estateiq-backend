@@ -38,11 +38,12 @@ app.use(
         "http://localhost:3000",
         "http://167.86.97.76:3000",
         "https://frontend-inbotsteam.vercel.app",
-        "https://estateiq-app.vercel.app"
+        "https://estateiq-app.vercel.app",
+        "https://inlearn.macsoft.ai"
       ];
 
-      // Allow any Vercel preview URLs
-      if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
+      // Allow any Vercel preview URLs or macsoft.ai subdomains
+      if (origin.endsWith('.vercel.app') || origin.endsWith('.macsoft.ai') || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 

@@ -31,9 +31,9 @@ import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'trainee-profiles');
 const ELEVENLABS_API_BASE = 'https://api.elevenlabs.io/v1';
 
-// ElevenLabs voice IDs
+// ElevenLabs voice IDs - Using high-quality multilingual voices
 const VOICE_IDS = {
-  ar: 'pFZP5JQG7iQjIQuC4Bku', // Khalid - Arabic male
+  ar: 'onwK4e9ZLuTAKqWW03F9', // Daniel - Professional multilingual voice (excellent Arabic)
   en: 'EXAVITQu4vr4xnSDxMaL', // Bella - English female
 };
 
@@ -1110,7 +1110,11 @@ Respond in JSON only:
 
     const voiceId = VOICE_IDS[language];
 
-    const response = await fetch(`${ELEVENLABS_API_BASE}/text-to-speech/${voiceId}`, {
+    // Use eleven_turbo_v2_5 for faster generation with good quality
+    // For Arabic, use eleven_multilingual_v2 for better pronunciation
+    const modelId = language === 'ar' ? 'eleven_multilingual_v2' : 'eleven_turbo_v2_5';
+
+    const response = await fetch(`${ELEVENLABS_API_BASE}/text-to-speech/${voiceId}?optimize_streaming_latency=3`, {
       method: 'POST',
       headers: {
         'xi-api-key': this.elevenLabsApiKey,
@@ -1118,11 +1122,11 @@ Respond in JSON only:
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: modelId,
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.5,
+          stability: 0.4,
+          similarity_boost: 0.8,
+          style: 0.3,
           use_speaker_boost: true,
         },
       }),

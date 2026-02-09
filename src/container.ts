@@ -46,6 +46,12 @@ import { AdminService } from './services/admin/admin.service';
 import { ElevenLabsService } from './services/elevenlabs/elevenlabs.service';
 import { AITeacherService } from './services/ai-teacher/ai-teacher.service';
 
+// Quiz System
+import { IQuizRepository } from './repositories/interfaces/quiz.repository.interface';
+import { QuizRepository } from './repositories/quiz.repository';
+import { IQuizService } from './services/interfaces/quiz.interface';
+import { QuizService } from './services/quiz/quiz.service';
+
 // Initialize Prisma Client
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -98,5 +104,18 @@ container.registerSingleton(ElevenLabsService, ElevenLabsService);
 
 // Register AI Teacher Service
 container.registerSingleton(AITeacherService, AITeacherService);
+
+// Register Quiz System
+container.registerSingleton<IQuizRepository>('QuizRepository', QuizRepository);
+container.registerSingleton<IQuizService>('QuizService', QuizService);
+
+// Register Flashcard System
+import { IFlashcardRepository } from './repositories/interfaces/flashcard.repository.interface';
+import { FlashcardRepository } from './repositories/flashcard.repository';
+import { IFlashcardService } from './services/interfaces/flashcard.interface';
+import { FlashcardService } from './services/flashcard/flashcard.service';
+
+container.registerSingleton<IFlashcardRepository>('FlashcardRepository', FlashcardRepository);
+container.registerSingleton<IFlashcardService>('FlashcardService', FlashcardService);
 
 export { container, prisma };

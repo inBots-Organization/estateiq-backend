@@ -160,16 +160,16 @@ export class AVContentService implements IAVContentService {
         lessonContext
       );
 
-      // Create slides in database
-      const slides = await this.createSlides(content.id, lectureStructure.slides);
-
-      // Generate audio for all slides
-      const audioUrl = await this.generateLectureAudio(
+      // Generate audio FIRST to get actual duration
+      const { audioUrl, actualDuration } = await this.generateLectureAudio(
         lectureStructure.slides,
         language
       );
 
-      // Update content with audio URL and ready status
+      // Create slides in database with actual timing
+      await this.createSlides(content.id, lectureStructure.slides, actualDuration);
+
+      // Update content with audio URL and actual duration
       const updatedContent = await this.prisma.aVContent.update({
         where: { id: content.id },
         data: {
@@ -177,7 +177,7 @@ export class AVContentService implements IAVContentService {
           titleAr: lectureStructure.titleAr,
           description: lectureStructure.description,
           descriptionAr: lectureStructure.descriptionAr,
-          totalDuration: lectureStructure.totalDuration,
+          totalDuration: Math.round(actualDuration),
           audioUrl,
           status: 'ready',
         },
@@ -328,20 +328,24 @@ Remember to output ONLY valid JSON, no markdown.`;
         totalDuration: summaryStructure.totalDuration,
       });
 
-      // Create slides
-      console.log('[AVContentService] Creating slides in database...');
-      await this.createSlides(content.id, summaryStructure.slides);
-      console.log('[AVContentService] Slides created successfully');
-
-      // Generate audio
+      // Generate audio FIRST to get actual duration
       console.log('[AVContentService] Generating audio with ElevenLabs...');
-      const audioUrl = await this.generateLectureAudio(
+      const { audioUrl, actualDuration } = await this.generateLectureAudio(
         summaryStructure.slides,
         language
       );
-      console.log('[AVContentService] Audio generated:', { hasAudio: !!audioUrl, audioLength: audioUrl?.length || 0 });
+      console.log('[AVContentService] Audio generated:', {
+        hasAudio: !!audioUrl,
+        audioLength: audioUrl?.length || 0,
+        actualDuration,
+      });
 
-      // Update content
+      // Create slides with actual audio duration for proper timing
+      console.log('[AVContentService] Creating slides in database with actual timing...');
+      await this.createSlides(content.id, summaryStructure.slides, actualDuration);
+      console.log('[AVContentService] Slides created successfully');
+
+      // Update content with actual duration
       const updatedContent = await this.prisma.aVContent.update({
         where: { id: content.id },
         data: {
@@ -349,7 +353,7 @@ Remember to output ONLY valid JSON, no markdown.`;
           titleAr: summaryStructure.titleAr,
           description: summaryStructure.description,
           descriptionAr: summaryStructure.descriptionAr,
-          totalDuration: summaryStructure.totalDuration,
+          totalDuration: Math.round(actualDuration), // Use actual duration
           audioUrl,
           status: 'ready',
         },
@@ -454,13 +458,17 @@ Output ONLY valid JSON, no markdown.`;
   // AUDIO GENERATION
   // ============================================================================
 
+  /**
+   * Generate audio and return with duration info
+   */
   private async generateLectureAudio(
     slides: GeminiSlideContent[],
     language: 'ar' | 'en' | 'bilingual'
-  ): Promise<string> {
+  ): Promise<{ audioUrl: string; actualDuration: number }> {
     if (!this.elevenLabsApiKey) {
-      // Return empty string if no API key - audio will be generated client-side or skipped
-      return '';
+      // Return empty string if no API key
+      const estimatedDuration = slides.reduce((sum, s) => sum + (s.duration || 30), 0);
+      return { audioUrl: '', actualDuration: estimatedDuration };
     }
 
     // Combine all narration texts
@@ -471,6 +479,7 @@ Output ONLY valid JSON, no markdown.`;
     );
 
     const fullNarration = narrationTexts.join('\n\n');
+    console.log('[AVContentService] Full narration length:', fullNarration.length, 'chars');
 
     // Generate audio using ElevenLabs
     const voiceId = VOICE_IDS[language === 'bilingual' ? 'ar' : language];
@@ -502,31 +511,62 @@ Output ONLY valid JSON, no markdown.`;
     if (!response.ok) {
       const error = await response.text();
       console.error('ElevenLabs TTS error:', error);
-      return ''; // Return empty - frontend can handle missing audio
+      const estimatedDuration = slides.reduce((sum, s) => sum + (s.duration || 30), 0);
+      return { audioUrl: '', actualDuration: estimatedDuration };
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const audioBase64 = Buffer.from(arrayBuffer).toString('base64');
 
-    // Return as data URL for direct playback
-    return `data:audio/mpeg;base64,${audioBase64}`;
+    // Estimate actual duration from MP3 file size
+    // MP3 at ~128kbps = ~16KB per second
+    const audioSizeBytes = arrayBuffer.byteLength;
+    const estimatedDurationFromSize = audioSizeBytes / 16000; // rough estimate
+
+    console.log('[AVContentService] Audio size:', audioSizeBytes, 'bytes, estimated duration:', estimatedDurationFromSize, 'seconds');
+
+    return {
+      audioUrl: `data:audio/mpeg;base64,${audioBase64}`,
+      actualDuration: estimatedDurationFromSize,
+    };
   }
 
   // ============================================================================
   // DATABASE HELPERS
   // ============================================================================
 
+  /**
+   * Create slides with properly distributed timestamps based on actual audio duration
+   */
   private async createSlides(
     contentId: string,
-    slides: GeminiSlideContent[]
+    slides: GeminiSlideContent[],
+    actualAudioDuration: number
   ): Promise<AVSlideResult[]> {
-    // Calculate audio timings based on duration estimates
+    // Calculate total estimated duration from Gemini
+    const totalEstimatedDuration = slides.reduce((sum, s) => sum + (s.duration || 30), 0);
+
+    // Calculate scale factor to match actual audio duration
+    const scaleFactor = actualAudioDuration / totalEstimatedDuration;
+
+    console.log('[AVContentService] Creating slides with timing:', {
+      slidesCount: slides.length,
+      totalEstimatedDuration,
+      actualAudioDuration,
+      scaleFactor,
+    });
+
+    // Distribute timestamps proportionally
     let currentTime = 0;
 
     const slideData = slides.map((slide, index) => {
       const startTime = currentTime;
-      const endTime = currentTime + slide.duration;
+      // Scale the duration to match actual audio
+      const scaledDuration = (slide.duration || 30) * scaleFactor;
+      const endTime = currentTime + scaledDuration;
       currentTime = endTime;
+
+      console.log(`[AVContentService] Slide ${index + 1}: ${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s (${scaledDuration.toFixed(1)}s)`);
 
       return {
         contentId,
@@ -539,9 +579,9 @@ Output ONLY valid JSON, no markdown.`;
         visualData: slide.visualData ? JSON.stringify(slide.visualData) : null,
         narrationText: slide.narrationText,
         narrationTextAr: slide.narrationTextAr,
-        audioStartTime: startTime,
-        audioEndTime: endTime,
-        duration: slide.duration,
+        audioStartTime: Math.round(startTime * 10) / 10, // Round to 1 decimal
+        audioEndTime: Math.round(endTime * 10) / 10,
+        duration: Math.round(scaledDuration * 10) / 10,
       };
     });
 

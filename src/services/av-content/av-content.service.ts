@@ -282,8 +282,11 @@ Remember to output ONLY valid JSON, no markdown.`;
   async generateSummary(params: GenerateSummaryParams): Promise<AVContentResult> {
     const { traineeId, topic, sourceText, focusAreas, language } = params;
 
+    console.log('[AVContentService] Starting summary generation:', { traineeId, topic, language });
+
     // Get trainee profile
     const traineeProfile = await this.getTraineeProfile(traineeId);
+    console.log('[AVContentService] Got trainee profile:', { weaknesses: traineeProfile.weaknesses });
 
     // Combine focus areas with trainee weaknesses
     const allFocusAreas = [
@@ -312,21 +315,31 @@ Remember to output ONLY valid JSON, no markdown.`;
 
     try {
       // Generate summary structure
+      console.log('[AVContentService] Calling Gemini to generate summary structure...');
       const summaryStructure = await this.generateSummaryStructure(
         topic,
         allFocusAreas,
         language,
         sourceText
       );
+      console.log('[AVContentService] Gemini response received:', {
+        title: summaryStructure.title,
+        slidesCount: summaryStructure.slides?.length || 0,
+        totalDuration: summaryStructure.totalDuration,
+      });
 
       // Create slides
+      console.log('[AVContentService] Creating slides in database...');
       await this.createSlides(content.id, summaryStructure.slides);
+      console.log('[AVContentService] Slides created successfully');
 
       // Generate audio
+      console.log('[AVContentService] Generating audio with ElevenLabs...');
       const audioUrl = await this.generateLectureAudio(
         summaryStructure.slides,
         language
       );
+      console.log('[AVContentService] Audio generated:', { hasAudio: !!audioUrl, audioLength: audioUrl?.length || 0 });
 
       // Update content
       const updatedContent = await this.prisma.aVContent.update({
@@ -342,8 +355,10 @@ Remember to output ONLY valid JSON, no markdown.`;
         },
       });
 
+      console.log('[AVContentService] Summary generation complete:', { contentId: content.id, status: 'ready' });
       return this.mapToAVContentResult(updatedContent);
     } catch (error) {
+      console.error('[AVContentService] Summary generation failed:', error);
       await this.prisma.aVContent.update({
         where: { id: content.id },
         data: { status: 'failed' },
@@ -358,9 +373,13 @@ Remember to output ONLY valid JSON, no markdown.`;
     language: 'ar' | 'en' | 'bilingual',
     sourceText?: string
   ): Promise<GeminiLectureResponse> {
+    console.log('[AVContentService] generateSummaryStructure called:', { topic, focusAreas, language });
+
     if (!this.geminiApiKey) {
+      console.error('[AVContentService] GEMINI_API_KEY is not configured!');
       throw new Error('Gemini API key not configured');
     }
+    console.log('[AVContentService] Gemini API key found (length:', this.geminiApiKey.length, ')');
 
     const focusAreasText = focusAreas.length > 0
       ? `Focus on these weak areas: ${focusAreas.join(', ')}`
@@ -385,6 +404,7 @@ Create 3-5 slides that:
 
 Output ONLY valid JSON, no markdown.`;
 
+    console.log('[AVContentService] Calling Gemini API...');
     const response = await fetch(
       `${GEMINI_API_BASE}/models/gemini-2.0-flash-001:generateContent?key=${this.geminiApiKey}`,
       {
@@ -402,8 +422,11 @@ Output ONLY valid JSON, no markdown.`;
       }
     );
 
+    console.log('[AVContentService] Gemini response status:', response.status);
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[AVContentService] Gemini API error:', errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json() as {

@@ -13,6 +13,7 @@ import { ElevenLabsController } from './controllers/elevenlabs.controller';
 import { VoiceController } from './controllers/voice.controller';
 import { AITeacherController } from './controllers/ai-teacher.controller';
 import { QuizController } from './controllers/quiz.controller';
+import { FlashcardController } from './controllers/flashcard.controller';
 
 // Import routes
 import adminRoutes from './routes/admin.routes';
@@ -97,6 +98,9 @@ apiRouter.use('/ai-teacher', aiTeacherController.router);
 
 const quizController = container.resolve(QuizController);
 apiRouter.use('/quizzes', quizController.router);
+
+const flashcardController = container.resolve(FlashcardController);
+apiRouter.use('/flashcards', flashcardController.router);
 
 app.use('/api', apiRouter);
 

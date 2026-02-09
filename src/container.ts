@@ -109,4 +109,13 @@ container.registerSingleton(AITeacherService, AITeacherService);
 container.registerSingleton<IQuizRepository>('QuizRepository', QuizRepository);
 container.registerSingleton<IQuizService>('QuizService', QuizService);
 
+// Register Flashcard System
+import { IFlashcardRepository } from './repositories/interfaces/flashcard.repository.interface';
+import { FlashcardRepository } from './repositories/flashcard.repository';
+import { IFlashcardService } from './services/interfaces/flashcard.interface';
+import { FlashcardService } from './services/flashcard/flashcard.service';
+
+container.registerSingleton<IFlashcardRepository>('FlashcardRepository', FlashcardRepository);
+container.registerSingleton<IFlashcardService>('FlashcardService', FlashcardService);
+
 export { container, prisma };

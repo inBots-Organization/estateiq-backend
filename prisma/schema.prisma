@@ -39,6 +39,7 @@ model Trainee {
   organization         Organization             @relation(fields: [organizationId], references: [id])
   trainerAssignments   TrainerGroupAssignment[]
   quizAttempts         QuizAttempt[]
+  cardProficiencies    CardProficiency[]
 
   @@map("trainees")
 }
@@ -62,6 +63,7 @@ model Course {
   program                  Program   @relation(fields: [programId], references: [id])
   lectures                 Lecture[]
   quizzes                  Quiz[]
+  flashcardDecks           FlashcardDeck[]
 
   @@map("courses")
 }
@@ -534,4 +536,74 @@ model QuizResponse {
 
   @@unique([attemptId, questionId])
   @@map("quiz_responses")
+}
+
+// ==========================================
+// Flashcard System Models
+// ==========================================
+
+model FlashcardDeck {
+  id              String            @id @default(uuid())
+  courseId         String?           @map("course_id")
+  organizationId  String?           @map("organization_id")
+  createdById     String            @map("created_by_id")
+  title           String
+  titleAr         String?           @map("title_ar")
+  description     String?
+  descriptionAr   String?           @map("description_ar")
+  category        String?
+  isPublished     Boolean           @default(false) @map("is_published")
+  generationType  String            @default("manual") @map("generation_type")
+  cardCount       Int               @default(0) @map("card_count")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  course          Course?           @relation(fields: [courseId], references: [id])
+  cards           Flashcard[]
+
+  @@index([courseId])
+  @@index([organizationId])
+  @@index([createdById])
+  @@map("flashcard_decks")
+}
+
+model Flashcard {
+  id            String            @id @default(uuid())
+  deckId        String            @map("deck_id")
+  front         String
+  frontAr       String?           @map("front_ar")
+  back          String
+  backAr        String?           @map("back_ar")
+  hint          String?
+  hintAr        String?           @map("hint_ar")
+  orderInDeck   Int               @default(0) @map("order_in_deck")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  deck          FlashcardDeck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  proficiencies CardProficiency[]
+
+  @@index([deckId])
+  @@map("flashcards")
+}
+
+model CardProficiency {
+  id             String        @id @default(uuid())
+  cardId         String        @map("card_id")
+  traineeId      String        @map("trainee_id")
+  easeFactor     Float         @default(2.5) @map("ease_factor")
+  interval       Int           @default(0)
+  repetitions    Int           @default(0)
+  quality        Int           @default(0)
+  nextReviewDate DateTime      @default(now()) @map("next_review_date")
+  lastReviewedAt DateTime?     @map("last_reviewed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  card           Flashcard     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  trainee        Trainee       @relation(fields: [traineeId], references: [id])
+
+  @@unique([cardId, traineeId])
+  @@index([traineeId, nextReviewDate])
+  @@map("card_proficiencies")
 }

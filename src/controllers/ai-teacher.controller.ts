@@ -7,6 +7,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { injectable, inject } from 'tsyringe';
 import { AITeacherService } from '../services/ai-teacher/ai-teacher.service';
+import { AVContentService } from '../services/av-content/av-content.service';
 import { authMiddleware } from '../middleware/auth.middleware';
 import multer, { FileFilterCallback } from 'multer';
 
@@ -85,7 +86,8 @@ export class AITeacherController {
   public router: Router;
 
   constructor(
-    @inject(AITeacherService) private aiTeacherService: AITeacherService
+    @inject(AITeacherService) private aiTeacherService: AITeacherService,
+    @inject(AVContentService) private avContentService: AVContentService
   ) {
     this.router = Router();
     this.initializeRoutes();
@@ -191,6 +193,52 @@ export class AITeacherController {
       '/video-timestamps',
       authMiddleware(['trainee', 'trainer', 'org_admin']),
       this.generateVideoTimestamps.bind(this)
+    );
+
+    // ============================================================================
+    // AV CONTENT GENERATION ENDPOINTS
+    // ============================================================================
+
+    // Generate video lecture
+    this.router.post(
+      '/av/generate-lecture',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.generateAVLecture.bind(this)
+    );
+
+    // Generate audio summary
+    this.router.post(
+      '/av/generate-summary',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.generateAVSummary.bind(this)
+    );
+
+    // Get specific AV content with slides
+    this.router.get(
+      '/av/content/:id',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.getAVContent.bind(this)
+    );
+
+    // List user's AV content
+    this.router.get(
+      '/av/content',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.listAVContent.bind(this)
+    );
+
+    // Submit feedback for AV content
+    this.router.post(
+      '/av/content/:id/feedback',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.submitAVFeedback.bind(this)
+    );
+
+    // Delete AV content
+    this.router.delete(
+      '/av/content/:id',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.deleteAVContent.bind(this)
     );
   }
 
@@ -573,6 +621,164 @@ export class AITeacherController {
       );
 
       res.status(200).json(timestamps);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ============================================================================
+  // AV CONTENT GENERATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Generate a video lecture with slides and audio
+   * POST /api/ai-teacher/av/generate-lecture
+   */
+  private async generateAVLecture(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const { topic, lessonContext, courseId, duration, language } = req.body;
+
+      if (!topic || typeof topic !== 'string') {
+        res.status(400).json({ error: 'Topic is required' });
+        return;
+      }
+
+      console.log('[AITeacherController] Generating AV lecture:', {
+        traineeId,
+        topic,
+        duration,
+        language,
+      });
+
+      const content = await this.avContentService.generateLecture({
+        traineeId,
+        topic,
+        lessonContext,
+        courseId,
+        duration: duration || 10,
+        language: language || 'ar',
+      });
+
+      res.status(200).json(content);
+    } catch (error) {
+      console.error('[AITeacherController] Generate lecture error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Generate an audio summary focused on weak areas
+   * POST /api/ai-teacher/av/generate-summary
+   */
+  private async generateAVSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const { topic, sourceText, focusAreas, language } = req.body;
+
+      if (!topic || typeof topic !== 'string') {
+        res.status(400).json({ error: 'Topic is required' });
+        return;
+      }
+
+      console.log('[AITeacherController] Generating AV summary:', {
+        traineeId,
+        topic,
+        hasFocusAreas: !!focusAreas,
+        language,
+      });
+
+      const content = await this.avContentService.generateSummary({
+        traineeId,
+        topic,
+        sourceText,
+        focusAreas,
+        language: language || 'ar',
+      });
+
+      res.status(200).json(content);
+    } catch (error) {
+      console.error('[AITeacherController] Generate summary error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Get specific AV content with all slides
+   * GET /api/ai-teacher/av/content/:id
+   */
+  private async getAVContent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const contentId = req.params.id;
+
+      const content = await this.avContentService.getContent(contentId, traineeId);
+      res.status(200).json(content);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * List user's AV content with pagination
+   * GET /api/ai-teacher/av/content
+   */
+  private async listAVContent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const type = req.query.type as 'lecture' | 'summary' | undefined;
+
+      const result = await this.avContentService.listContent(traineeId, {
+        page,
+        limit,
+        type,
+      });
+
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Submit feedback for AV content
+   * POST /api/ai-teacher/av/content/:id/feedback
+   */
+  private async submitAVFeedback(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const contentId = req.params.id;
+      const { rating, helpful, comment, watchDuration, completedSlides } = req.body;
+
+      await this.avContentService.submitFeedback({
+        contentId,
+        traineeId,
+        rating,
+        helpful,
+        comment,
+        watchDuration,
+        completedSlides,
+      });
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete AV content
+   * DELETE /api/ai-teacher/av/content/:id
+   */
+  private async deleteAVContent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const contentId = req.params.id;
+
+      await this.avContentService.deleteContent(contentId, traineeId);
+      res.status(200).json({ success: true });
     } catch (error) {
       next(error);
     }

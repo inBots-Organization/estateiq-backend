@@ -40,6 +40,7 @@ model Trainee {
   trainerAssignments   TrainerGroupAssignment[]
   quizAttempts         QuizAttempt[]
   cardProficiencies    CardProficiency[]
+  avContent            AVContent[]
 
   @@map("trainees")
 }
@@ -606,4 +607,74 @@ model CardProficiency {
   @@unique([cardId, traineeId])
   @@index([traineeId, nextReviewDate])
   @@map("card_proficiencies")
+}
+
+// ==========================================
+// AV Content Generation Models
+// ==========================================
+
+model AVContent {
+  id              String       @id @default(uuid())
+  traineeId       String       @map("trainee_id")
+  type            String       // "lecture" | "summary"
+  title           String
+  titleAr         String?      @map("title_ar")
+  description     String?
+  descriptionAr   String?      @map("description_ar")
+  topic           String
+  sourceContext   String?      @map("source_context")  // lesson/course context used
+  totalDuration   Int          @map("total_duration")  // seconds
+  status          String       @default("generating")  // generating, ready, failed
+  audioUrl        String?      @map("audio_url")
+  metadata        String       @default("{}")  // JSON: language, voice, adaptations
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  trainee         Trainee      @relation(fields: [traineeId], references: [id])
+  slides          AVSlide[]
+  feedback        AVFeedback[]
+
+  @@index([traineeId])
+  @@index([type])
+  @@map("av_content")
+}
+
+model AVSlide {
+  id              String      @id @default(uuid())
+  contentId       String      @map("content_id")
+  slideNumber     Int         @map("slide_number")
+  title           String
+  titleAr         String?     @map("title_ar")
+  bulletPoints    String      @default("[]")  // JSON array
+  bulletPointsAr  String?     @map("bullet_points_ar")  // JSON array
+  visualType      String      @map("visual_type")  // "bullets", "diagram", "chart", "image"
+  visualData      String?     @map("visual_data")  // JSON for charts/diagrams
+  narrationText   String      @map("narration_text")
+  narrationTextAr String?     @map("narration_text_ar")
+  audioStartTime  Float       @map("audio_start_time")  // seconds
+  audioEndTime    Float       @map("audio_end_time")
+  duration        Int         // seconds
+
+  content         AVContent   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+  @@map("av_slides")
+}
+
+model AVFeedback {
+  id              String      @id @default(uuid())
+  contentId       String      @map("content_id")
+  traineeId       String      @map("trainee_id")
+  rating          Int?        // 1-5
+  helpful         Boolean?
+  comment         String?
+  watchDuration   Int?        @map("watch_duration")  // seconds watched
+  completedSlides Int[]       @map("completed_slides")  // slide numbers viewed
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  content         AVContent   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+  @@index([traineeId])
+  @@map("av_feedback")
 }

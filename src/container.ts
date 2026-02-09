@@ -105,6 +105,10 @@ container.registerSingleton(ElevenLabsService, ElevenLabsService);
 // Register AI Teacher Service
 container.registerSingleton(AITeacherService, AITeacherService);
 
+// Register AV Content Service
+import { AVContentService } from './services/av-content/av-content.service';
+container.registerSingleton(AVContentService, AVContentService);
+
 // Register Quiz System
 container.registerSingleton<IQuizRepository>('QuizRepository', QuizRepository);
 container.registerSingleton<IQuizService>('QuizService', QuizService);

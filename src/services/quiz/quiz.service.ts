@@ -12,6 +12,7 @@ import {
 } from '../interfaces/quiz.interface';
 import { IQuizRepository, QuizWithQuestions, QuizWithCount } from '../../repositories/interfaces/quiz.repository.interface';
 import { CreateQuizInput, UpdateQuizInput, SubmitResponseInput, GenerateQuizInput } from '../../dtos/validation/quiz.validation';
+import { NotFoundError } from '../../middleware/error-handler.middleware';
 
 @injectable()
 export class QuizService implements IQuizService {
@@ -72,7 +73,7 @@ export class QuizService implements IQuizService {
 
   async updateQuiz(quizId: string, data: UpdateQuizInput): Promise<QuizDetail> {
     const existing = await this.quizRepository.findById(quizId);
-    if (!existing) throw new Error('Quiz not found');
+    if (!existing) throw new NotFoundError('Quiz not found');
 
     // Update quiz metadata
     await this.quizRepository.update(quizId, {
@@ -121,13 +122,13 @@ export class QuizService implements IQuizService {
 
   async deleteQuiz(quizId: string): Promise<void> {
     const existing = await this.quizRepository.findById(quizId);
-    if (!existing) throw new Error('Quiz not found');
+    if (!existing) throw new NotFoundError('Quiz not found');
     await this.quizRepository.delete(quizId);
   }
 
   async publishQuiz(quizId: string, publish: boolean): Promise<void> {
     const existing = await this.quizRepository.findById(quizId);
-    if (!existing) throw new Error('Quiz not found');
+    if (!existing) throw new NotFoundError('Quiz not found');
 
     if (publish) {
       // Validate quiz has at least 1 question with correct answer
@@ -148,7 +149,7 @@ export class QuizService implements IQuizService {
 
   async getQuizForAdmin(quizId: string): Promise<QuizDetail> {
     const quiz = await this.quizRepository.findByIdWithQuestions(quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new NotFoundError('Quiz not found');
     return this.mapQuizToDetail(quiz, true);
   }
 
@@ -191,7 +192,7 @@ export class QuizService implements IQuizService {
 
   async getQuizForTaking(quizId: string, traineeId: string): Promise<QuizDetail> {
     const quiz = await this.quizRepository.findByIdWithQuestions(quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new NotFoundError('Quiz not found');
     if (!quiz.isPublished) throw new Error('Quiz is not available');
 
     // Strip correct answers for trainee view
@@ -200,7 +201,7 @@ export class QuizService implements IQuizService {
 
   async startAttempt(traineeId: string, quizId: string): Promise<{ attemptId: string }> {
     const quiz = await this.quizRepository.findById(quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new NotFoundError('Quiz not found');
     if (!quiz.isPublished) throw new Error('Quiz is not available');
 
     // Check max attempts
@@ -222,13 +223,13 @@ export class QuizService implements IQuizService {
   ): Promise<QuizAttemptResult> {
     // Validate attempt ownership
     const attempt = await this.quizRepository.findAttemptById(attemptId);
-    if (!attempt) throw new Error('Attempt not found');
+    if (!attempt) throw new NotFoundError('Attempt not found');
     if (attempt.traineeId !== traineeId) throw new Error('Unauthorized');
     if (attempt.status === 'completed') throw new Error('Attempt already completed');
 
     // Get full quiz with answers
     const quiz = await this.quizRepository.findByIdWithQuestions(attempt.quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new NotFoundError('Quiz not found');
 
     // Build answer map: questionId -> correct optionId
     const questionMap = new Map(
@@ -288,12 +289,12 @@ export class QuizService implements IQuizService {
 
   async getAttemptResult(attemptId: string, traineeId: string): Promise<QuizAttemptResult> {
     const attempt = await this.quizRepository.findAttemptById(attemptId);
-    if (!attempt) throw new Error('Attempt not found');
+    if (!attempt) throw new NotFoundError('Attempt not found');
     if (attempt.traineeId !== traineeId) throw new Error('Unauthorized');
     if (attempt.status !== 'completed') throw new Error('Attempt not completed yet');
 
     const quiz = await this.quizRepository.findByIdWithQuestions(attempt.quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new NotFoundError('Quiz not found');
 
     const responses = await this.quizRepository.findResponsesByAttempt(attemptId);
 

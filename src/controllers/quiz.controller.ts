@@ -67,10 +67,10 @@ export class QuizController {
       this.listQuizzesForAdmin.bind(this)
     );
 
-    // POST /api/quizzes/generate — AI-generate quiz
+    // POST /api/quizzes/generate — AI-generate quiz (trainees can generate for themselves)
     this.router.post(
       '/generate',
-      authMiddleware(['trainer', 'org_admin']),
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
       validateRequest(GenerateQuizSchema),
       this.generateQuiz.bind(this)
     );

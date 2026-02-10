@@ -97,4 +97,18 @@ export class CourseRepository implements ICourseRepository {
 
     return completions.map(c => c.lectureId);
   }
+
+  async findByCompetencyTags(tags: string[]): Promise<Course[]> {
+    if (tags.length === 0) return [];
+
+    return this.prisma.course.findMany({
+      where: {
+        isPublished: true,
+        competencyTags: {
+          hasSome: tags,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

@@ -37,10 +37,14 @@ model Trainee {
   notesReceived        TraineeNote[]            @relation("NoteSubject")
   currentLevel         Level?                   @relation(fields: [currentLevelId], references: [id])
   organization         Organization             @relation(fields: [organizationId], references: [id])
-  trainerAssignments   TrainerGroupAssignment[]
-  quizAttempts         QuizAttempt[]
-  cardProficiencies    CardProficiency[]
-  avContent            AVContent[]
+  trainerAssignments    TrainerGroupAssignment[]
+  quizAttempts          QuizAttempt[]
+  cardProficiencies     CardProficiency[]
+  avContent             AVContent[]
+  lastDiagnosticAt      DateTime?                @map("last_diagnostic_at")
+  currentSkillLevel     String?                  @map("current_skill_level")
+  diagnosticSessions    DiagnosticSession[]
+  dailySkillReports     DailySkillReport[]
 
   @@map("trainees")
 }
@@ -56,6 +60,7 @@ model Course {
   estimatedDurationMinutes Int       @map("estimated_duration_minutes")
   difficulty               String
   category                 String
+  competencyTags           String[]  @default([]) @map("competency_tags")
   isPublished              Boolean   @default(false) @map("is_published")
   orderInLevel             Int       @map("order_in_level")
   createdAt                DateTime  @default(now()) @map("created_at")
@@ -677,4 +682,57 @@ model AVFeedback {
   @@index([contentId])
   @@index([traineeId])
   @@map("av_feedback")
+}
+
+// ============================================
+// Adaptive Learning — Diagnostic System
+// ============================================
+
+model DiagnosticSession {
+  id                    String    @id @default(uuid())
+  traineeId             String    @map("trainee_id")
+  simulationSessionId   String?   @map("simulation_session_id")
+  quizAttemptId         String?   @map("quiz_attempt_id")
+  overallLevel          String?   @map("overall_level")
+  overallScore          Float?    @map("overall_score")
+  skillScores           String?   @map("skill_scores")
+  strengths             String[]  @default([])
+  weaknesses            String[]  @default([])
+  knowledgeGaps         String[]  @default([]) @map("knowledge_gaps")
+  aiNotes               String?   @map("ai_notes")
+  status                String    @default("pending")
+  triggeredBy           String    @default("system") @map("triggered_by")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  completedAt           DateTime? @map("completed_at")
+
+  trainee               Trainee   @relation(fields: [traineeId], references: [id])
+  dailySkillReport      DailySkillReport?
+
+  @@index([traineeId, createdAt])
+  @@map("diagnostic_sessions")
+}
+
+model DailySkillReport {
+  id                      String    @id @default(uuid())
+  traineeId               String    @map("trainee_id")
+  date                    DateTime  @db.Date
+  level                   String
+  overallScore            Float     @map("overall_score")
+  skillScores             String    @map("skill_scores")
+  strengths               String[]  @default([])
+  weaknesses              String[]  @default([])
+  knowledgeGaps           String[]  @default([]) @map("knowledge_gaps")
+  diagnosticSessionId     String?   @unique @map("diagnostic_session_id")
+  dataSourceIds           String?   @map("data_source_ids")
+  recommendedCourseIds    String[]  @default([]) @map("recommended_course_ids")
+  recommendedTopics       String[]  @default([]) @map("recommended_topics")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  trainee                 Trainee   @relation(fields: [traineeId], references: [id])
+  diagnosticSession       DiagnosticSession? @relation(fields: [diagnosticSessionId], references: [id])
+
+  @@unique([traineeId, date])
+  @@index([traineeId, date])
+  @@map("daily_skill_reports")
 }

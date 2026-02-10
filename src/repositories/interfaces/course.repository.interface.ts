@@ -18,4 +18,5 @@ export interface ICourseRepository {
     category?: CourseCategory;
   }): Promise<Course[]>;
   getTraineeCompletedLectures(traineeId: string, courseId: string): Promise<string[]>;
+  findByCompetencyTags(tags: string[]): Promise<Course[]>;
 }

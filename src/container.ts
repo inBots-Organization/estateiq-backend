@@ -122,4 +122,13 @@ import { FlashcardService } from './services/flashcard/flashcard.service';
 container.registerSingleton<IFlashcardRepository>('FlashcardRepository', FlashcardRepository);
 container.registerSingleton<IFlashcardService>('FlashcardService', FlashcardService);
 
+// Register Diagnostic (Adaptive Learning) System
+import { IDiagnosticRepository } from './repositories/interfaces/diagnostic.repository.interface';
+import { DiagnosticRepository } from './repositories/diagnostic.repository';
+import { IDiagnosticService } from './services/interfaces/diagnostic.interface';
+import { DiagnosticService } from './services/diagnostic/diagnostic.service';
+
+container.registerSingleton<IDiagnosticRepository>('DiagnosticRepository', DiagnosticRepository);
+container.registerSingleton<IDiagnosticService>('DiagnosticService', DiagnosticService);
+
 export { container, prisma };

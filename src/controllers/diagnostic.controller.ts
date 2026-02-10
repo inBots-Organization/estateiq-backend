@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
 import { Router, Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { IDiagnosticService } from '../services/interfaces/diagnostic.interface';
 
@@ -8,7 +9,8 @@ export class DiagnosticController {
   public router: Router;
 
   constructor(
-    @inject('DiagnosticService') private diagnosticService: IDiagnosticService
+    @inject('DiagnosticService') private diagnosticService: IDiagnosticService,
+    @inject('PrismaClient') private prisma: PrismaClient
   ) {
     this.router = Router();
     this.initializeRoutes();
@@ -55,6 +57,13 @@ export class DiagnosticController {
       '/report/history',
       authMiddleware(['trainee', 'trainer', 'org_admin']),
       this.getReportHistory.bind(this)
+    );
+
+    // Get evaluator report (Bot 5)
+    this.router.get(
+      '/evaluator-report',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.getEvaluatorReport.bind(this)
     );
   }
 
@@ -145,6 +154,55 @@ export class DiagnosticController {
         currentReport: status.currentReport,
         needsDiagnostic: status.needsDiagnostic,
         hoursSinceLast: status.hoursSinceLast,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  private async getEvaluatorReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+
+      // Get the latest DailySkillReport with evaluator data
+      const report = await this.prisma.dailySkillReport.findFirst({
+        where: { traineeId },
+        orderBy: { date: 'desc' },
+      });
+
+      if (!report) {
+        res.status(404).json({ error: 'No skill report found' });
+        return;
+      }
+
+      // Get trainee's assigned teacher
+      const trainee = await this.prisma.trainee.findUnique({
+        where: { id: traineeId },
+        select: { assignedTeacher: true, assignedTeacherAt: true },
+      });
+
+      const evaluatorStatus = report.evaluatorStatus || 'pending';
+
+      if (evaluatorStatus !== 'completed' || !report.evaluatorReport) {
+        res.status(200).json({
+          evaluatorReport: null,
+          evaluatorStatus,
+          assignedTeacher: trainee?.assignedTeacher || null,
+        });
+        return;
+      }
+
+      let parsedReport = null;
+      try {
+        parsedReport = JSON.parse(report.evaluatorReport);
+      } catch {
+        parsedReport = null;
+      }
+
+      res.status(200).json({
+        evaluatorReport: parsedReport,
+        evaluatorStatus,
+        assignedTeacher: trainee?.assignedTeacher || null,
       });
     } catch (error) {
       next(error);

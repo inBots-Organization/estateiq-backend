@@ -55,4 +55,7 @@ export interface IDiagnosticRepository {
     lastDiagnosticAt?: Date;
     currentSkillLevel?: string;
   }): Promise<void>;
+
+  // Trainee helpers
+  getTraineeOrganizationId(traineeId: string): Promise<string | null>;
 }

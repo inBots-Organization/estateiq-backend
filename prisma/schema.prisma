@@ -43,6 +43,8 @@ model Trainee {
   avContent             AVContent[]
   lastDiagnosticAt      DateTime?                @map("last_diagnostic_at")
   currentSkillLevel     String?                  @map("current_skill_level")
+  assignedTeacher       String?                  @map("assigned_teacher")
+  assignedTeacherAt     DateTime?                @map("assigned_teacher_at")
   diagnosticSessions    DiagnosticSession[]
   dailySkillReports     DailySkillReport[]
 
@@ -726,6 +728,8 @@ model DailySkillReport {
   dataSourceIds           String?   @map("data_source_ids")
   recommendedCourseIds    String[]  @default([]) @map("recommended_course_ids")
   recommendedTopics       String[]  @default([]) @map("recommended_topics")
+  evaluatorReport         String?   @map("evaluator_report")
+  evaluatorStatus         String?   @default("pending") @map("evaluator_status")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 

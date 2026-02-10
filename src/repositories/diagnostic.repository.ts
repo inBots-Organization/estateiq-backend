@@ -153,4 +153,12 @@ export class DiagnosticRepository implements IDiagnosticRepository {
       data: updateData,
     });
   }
+
+  async getTraineeOrganizationId(traineeId: string): Promise<string | null> {
+    const trainee = await this.prisma.trainee.findUnique({
+      where: { id: traineeId },
+      select: { organizationId: true },
+    });
+    return trainee?.organizationId || null;
+  }
 }

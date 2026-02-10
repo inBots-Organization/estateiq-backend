@@ -141,4 +141,8 @@ container.registerSingleton(GeminiEmbeddingProvider, GeminiEmbeddingProvider);
 container.registerSingleton<IBrainRepository>('BrainRepository', BrainRepository);
 container.registerSingleton(BrainService, BrainService);
 
+// Register Evaluator (Bot 5) Service
+import { EvaluatorService } from './services/evaluator/evaluator.service';
+container.registerSingleton(EvaluatorService, EvaluatorService);
+
 export { container, prisma };

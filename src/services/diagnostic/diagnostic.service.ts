@@ -15,6 +15,7 @@ import {
   SkillLevel,
   CORE_SKILLS,
 } from '../interfaces/diagnostic.interface';
+import { EvaluatorService } from '../evaluator/evaluator.service';
 
 const DIAGNOSTIC_THRESHOLD_HOURS = 18;
 
@@ -25,7 +26,8 @@ export class DiagnosticService implements IDiagnosticService {
     @inject('ReportRepository') private reportRepo: IReportRepository,
     @inject('SimulationRepository') private simulationRepo: ISimulationRepository,
     @inject('QuizRepository') private quizRepo: IQuizRepository,
-    @inject('CourseRepository') private courseRepo: ICourseRepository
+    @inject('CourseRepository') private courseRepo: ICourseRepository,
+    @inject(EvaluatorService) private evaluatorService: EvaluatorService
   ) {}
 
   async checkStatus(traineeId: string): Promise<DiagnosticStatusOutput> {
@@ -147,7 +149,7 @@ export class DiagnosticService implements IDiagnosticService {
     });
 
     // Upsert the daily skill report
-    await this.diagnosticRepo.upsertDailyReport({
+    const dailyReport = await this.diagnosticRepo.upsertDailyReport({
       traineeId: input.traineeId,
       date: today,
       level,
@@ -169,6 +171,26 @@ export class DiagnosticService implements IDiagnosticService {
     await this.diagnosticRepo.updateTraineeDiagnosticFields(input.traineeId, {
       lastDiagnosticAt: new Date(),
       currentSkillLevel: level,
+    });
+
+    // Fire-and-forget: run Bot 5 evaluator
+    this.diagnosticRepo.getTraineeOrganizationId(input.traineeId).then(organizationId => {
+      this.evaluatorService.evaluate({
+        traineeId: input.traineeId,
+        organizationId: organizationId || '',
+        diagnosticSessionId: session.id,
+        dailySkillReportId: dailyReport.id,
+        skillScores,
+        overallScore,
+        level,
+        strengths,
+        weaknesses,
+        knowledgeGaps,
+      }).catch(err => {
+        console.error('[DiagnosticService] Bot 5 evaluator failed:', err);
+      });
+    }).catch(err => {
+      console.error('[DiagnosticService] Failed to get trainee org for evaluator:', err);
     });
 
     return {

@@ -15,6 +15,7 @@ import { AITeacherController } from './controllers/ai-teacher.controller';
 import { QuizController } from './controllers/quiz.controller';
 import { FlashcardController } from './controllers/flashcard.controller';
 import { DiagnosticController } from './controllers/diagnostic.controller';
+import { BrainController } from './controllers/brain.controller';
 
 // Import routes
 import adminRoutes from './routes/admin.routes';
@@ -106,6 +107,9 @@ apiRouter.use('/flashcards', flashcardController.router);
 
 const diagnosticController = container.resolve(DiagnosticController);
 apiRouter.use('/diagnostics', diagnosticController.router);
+
+const brainController = container.resolve(BrainController);
+apiRouter.use('/brain', brainController.router);
 
 app.use('/api', apiRouter);
 

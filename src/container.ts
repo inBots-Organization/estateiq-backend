@@ -131,4 +131,14 @@ import { DiagnosticService } from './services/diagnostic/diagnostic.service';
 container.registerSingleton<IDiagnosticRepository>('DiagnosticRepository', DiagnosticRepository);
 container.registerSingleton<IDiagnosticService>('DiagnosticService', DiagnosticService);
 
+// Register AI Brain System
+import { GeminiEmbeddingProvider } from './providers/embedding/gemini-embedding.provider';
+import { IBrainRepository } from './repositories/interfaces/brain.repository.interface';
+import { BrainRepository } from './repositories/brain.repository';
+import { BrainService } from './services/brain/brain.service';
+
+container.registerSingleton(GeminiEmbeddingProvider, GeminiEmbeddingProvider);
+container.registerSingleton<IBrainRepository>('BrainRepository', BrainRepository);
+container.registerSingleton(BrainService, BrainService);
+
 export { container, prisma };

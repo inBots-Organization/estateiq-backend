@@ -736,3 +736,45 @@ model DailySkillReport {
   @@index([traineeId, date])
   @@map("daily_skill_reports")
 }
+
+// ─── AI Brain (RAG Knowledge Base) ────────────────────────
+
+model BrainDocument {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  title          String
+  fileName       String       @map("file_name")
+  fileType       String       @map("file_type")
+  fileSize       Int          @map("file_size")
+  gcsPath        String?      @map("gcs_path")
+  status         String       @default("processing")
+  chunkCount     Int          @default(0) @map("chunk_count")
+  uploadedBy     String       @map("uploaded_by")
+  metadata       String       @default("{}")
+  errorMessage   String?      @map("error_message")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  chunks         BrainChunk[]
+
+  @@unique([organizationId, fileName])
+  @@index([organizationId, status])
+  @@map("brain_documents")
+}
+
+model BrainChunk {
+  id             String        @id @default(uuid())
+  documentId     String        @map("document_id")
+  organizationId String        @map("organization_id")
+  chunkIndex     Int           @map("chunk_index")
+  content        String
+  // embedding column added via raw SQL (pgvector vector(768))
+  metadata       String        @default("{}")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  document       BrainDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([documentId])
+  @@map("brain_chunks")
+}

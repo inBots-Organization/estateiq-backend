@@ -2,7 +2,7 @@ import { SkillScores, SkillLevel } from './diagnostic.interface';
 
 // ─── AI Teacher Names ────────────────────────────────────
 
-export type AITeacherName = 'ahmed' | 'noura' | 'anas';
+export type AITeacherName = 'ahmed' | 'noura' | 'anas' | 'abdullah';
 
 // ─── Teacher Assignment ──────────────────────────────────
 

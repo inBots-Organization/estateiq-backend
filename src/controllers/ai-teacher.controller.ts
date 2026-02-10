@@ -9,6 +9,7 @@ import { injectable, inject } from 'tsyringe';
 import { AITeacherService } from '../services/ai-teacher/ai-teacher.service';
 import { AVContentService } from '../services/av-content/av-content.service';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { isValidTeacherName } from '../services/ai-teacher/teacher-personas.config';
 import multer, { FileFilterCallback } from 'multer';
 
 // Extend Request type to include file property
@@ -137,6 +138,13 @@ export class AITeacherController {
       '/history',
       authMiddleware(['trainee', 'trainer', 'org_admin']),
       this.getHistory.bind(this)
+    );
+
+    // Assigned teacher endpoint
+    this.router.get(
+      '/assigned-teacher',
+      authMiddleware(['trainee']),
+      this.getAssignedTeacher.bind(this)
     );
 
     // Voice endpoints
@@ -302,7 +310,14 @@ export class AITeacherController {
   private async getWelcome(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const traineeId = req.user!.userId;
-      const welcome = await this.aiTeacherService.generateWelcome(traineeId);
+      const teacherName = req.query.teacherName as string | undefined;
+
+      if (teacherName && !isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+        return;
+      }
+
+      const welcome = await this.aiTeacherService.generateWelcome(traineeId, teacherName);
       res.status(200).json(welcome);
     } catch (error) {
       next(error);
@@ -312,14 +327,19 @@ export class AITeacherController {
   private async sendMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const traineeId = req.user!.userId;
-      const { message, attachments, lessonContext } = req.body;
+      const { message, attachments, lessonContext, teacherName } = req.body;
 
       if (!message || typeof message !== 'string') {
         res.status(400).json({ error: 'Message is required' });
         return;
       }
 
-      const response = await this.aiTeacherService.sendMessage(traineeId, message, attachments, lessonContext);
+      if (teacherName && !isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+        return;
+      }
+
+      const response = await this.aiTeacherService.sendMessage(traineeId, message, attachments, lessonContext, teacherName);
       res.status(200).json(response);
     } catch (error) {
       next(error);
@@ -333,10 +353,15 @@ export class AITeacherController {
   private async sendMessageStream(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const traineeId = req.user!.userId;
-      const { message, attachments, lessonContext } = req.body;
+      const { message, attachments, lessonContext, teacherName } = req.body;
 
       if (!message || typeof message !== 'string') {
         res.status(400).json({ error: 'Message is required' });
+        return;
+      }
+
+      if (teacherName && !isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
         return;
       }
 
@@ -352,7 +377,8 @@ export class AITeacherController {
         traineeId,
         message,
         attachments,
-        lessonContext
+        lessonContext,
+        teacherName
       )) {
         // Send as SSE event
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
@@ -387,9 +413,25 @@ export class AITeacherController {
     try {
       const traineeId = req.user!.userId;
       const limit = parseInt(req.query.limit as string) || 10;
+      const teacherName = req.query.teacherName as string | undefined;
 
-      const history = await this.aiTeacherService.getSessionHistory(traineeId, limit);
+      if (teacherName && !isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+        return;
+      }
+
+      const history = await this.aiTeacherService.getSessionHistory(traineeId, limit, teacherName);
       res.status(200).json(history);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  private async getAssignedTeacher(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const result = await this.aiTeacherService.getAssignedTeacher(traineeId);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

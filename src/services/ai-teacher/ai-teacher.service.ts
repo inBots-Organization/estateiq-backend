@@ -26,6 +26,8 @@ import {
 } from '../interfaces/ai-teacher.interface';
 import { ILLMProvider } from '../../providers/llm/llm-provider.interface';
 import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
+import { BrainService } from '../brain/brain.service';
+import { TEACHER_PERSONAS, TeacherPersonaName, isValidTeacherName } from './teacher-personas.config';
 
 // Constants
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'trainee-profiles');
@@ -45,7 +47,8 @@ export class AITeacherService implements IAITeacherService {
 
   constructor(
     @inject('PrismaClient') private prisma: PrismaClient,
-    @inject('LLMProvider') private llmProvider: ILLMProvider
+    @inject('LLMProvider') private llmProvider: ILLMProvider,
+    @inject(BrainService) private brainService: BrainService
   ) {
     this.elevenLabsApiKey = process.env.ELEVENLABS_API_KEY || '';
     this.fallbackProvider = new FallbackLLMProvider();
@@ -442,6 +445,156 @@ ${sessionNotesSection}
   }
 
   // ============================================================================
+  // TEACHER PERSONA HELPERS
+  // ============================================================================
+
+  private getSessionKey(traineeId: string, teacherName?: string): string {
+    return teacherName ? `${traineeId}:${teacherName}` : traineeId;
+  }
+
+  /**
+   * Get Brain/RAG context for Ahmed, Noura, Anas
+   */
+  private async getBrainContext(traineeId: string, teacherName: TeacherPersonaName, userMessage: string): Promise<string> {
+    const persona = TEACHER_PERSONAS[teacherName];
+    if (persona.contextSource !== 'brain') return '';
+
+    try {
+      // Get trainee's organizationId
+      const trainee = await this.prisma.trainee.findUnique({
+        where: { id: traineeId },
+        select: { organizationId: true },
+      });
+
+      if (!trainee?.organizationId) return '';
+
+      const query = `${persona.brainQueryPrefix || ''} ${userMessage}`.trim().slice(0, 200);
+      const result = await this.brainService.queryBrain({
+        query,
+        organizationId: trainee.organizationId,
+        topK: 3,
+        scoreThreshold: 0.3,
+      });
+
+      if (!result.results || result.results.length === 0) return 'No relevant documents found.';
+
+      return result.results
+        .map((r) => `[${r.documentTitle}]: ${r.content}`)
+        .join('\n\n');
+    } catch (error) {
+      console.error('[AITeacherService] getBrainContext error:', error);
+      return 'Knowledge base temporarily unavailable.';
+    }
+  }
+
+  /**
+   * Get user performance history context for Abdullah
+   */
+  private async getUserHistoryContext(traineeId: string): Promise<string> {
+    try {
+      const sections: string[] = [];
+
+      // Last 10 simulation sessions
+      const simSessions = await this.prisma.simulationSession.findMany({
+        where: { traineeId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, scenarioType: true, status: true, outcome: true, createdAt: true },
+      });
+      if (simSessions.length > 0) {
+        sections.push('## Simulation Sessions:\n' + simSessions.map(
+          (s) => `- ${s.scenarioType} | Status: ${s.status} | Outcome: ${s.outcome ?? 'N/A'} | ${s.createdAt.toLocaleDateString()}`
+        ).join('\n'));
+      }
+
+      // Last 5 voice sessions
+      const voiceSessions = await this.prisma.voiceSession.findMany({
+        where: { traineeId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, overallScore: true, durationSeconds: true, createdAt: true },
+      });
+      if (voiceSessions.length > 0) {
+        sections.push('## Voice Sessions:\n' + voiceSessions.map(
+          (v) => `- Score: ${v.overallScore ?? 'N/A'}% | Duration: ${v.durationSeconds}s | ${v.createdAt.toLocaleDateString()}`
+        ).join('\n'));
+      }
+
+      // Last 3 diagnostic daily reports
+      const dailyReports = await this.prisma.dailySkillReport.findMany({
+        where: { traineeId },
+        orderBy: { date: 'desc' },
+        take: 3,
+        select: { date: true, overallScore: true, level: true, skillScores: true },
+      });
+      if (dailyReports.length > 0) {
+        sections.push('## Diagnostic Reports:\n' + dailyReports.map(
+          (r) => `- ${r.date.toLocaleDateString()} | Overall: ${r.overallScore}% | Level: ${r.level}`
+        ).join('\n'));
+      }
+
+      // Last 10 quiz attempts
+      const quizAttempts = await this.prisma.quizAttempt.findMany({
+        where: { traineeId },
+        orderBy: { startedAt: 'desc' },
+        take: 10,
+        select: { score: true, totalPoints: true, earnedPoints: true, passed: true, startedAt: true },
+      });
+      if (quizAttempts.length > 0) {
+        sections.push('## Quiz Attempts:\n' + quizAttempts.map(
+          (q) => `- Score: ${q.score ?? 'N/A'}% | Points: ${q.earnedPoints ?? 0}/${q.totalPoints ?? 0} | Passed: ${q.passed ? 'Yes' : 'No'} | ${q.startedAt.toLocaleDateString()}`
+        ).join('\n'));
+      }
+
+      return sections.length > 0 ? sections.join('\n\n') : 'No training history available yet.';
+    } catch (error) {
+      console.error('[AITeacherService] getUserHistoryContext error:', error);
+      return 'Performance history temporarily unavailable.';
+    }
+  }
+
+  /**
+   * Build system prompt for a specific teacher persona
+   */
+  private async buildPersonaSystemPrompt(
+    traineeId: string,
+    teacherName: TeacherPersonaName,
+    profileMarkdown: string,
+    lessonContextSection: string,
+    attachmentContext: string,
+    isArabic: boolean,
+    userMessage?: string
+  ): Promise<string> {
+    const persona = TEACHER_PERSONAS[teacherName];
+
+    // Get context based on persona type
+    let context: string;
+    if (persona.contextSource === 'brain') {
+      context = await this.getBrainContext(traineeId, teacherName, userMessage || '');
+    } else {
+      context = await this.getUserHistoryContext(traineeId);
+    }
+
+    // Select the right system prompt template
+    const template = isArabic ? persona.systemPromptAr : persona.systemPromptEn;
+
+    // Replace placeholders
+    let prompt = template
+      .replace('{{PROFILE}}', profileMarkdown)
+      .replace('{{CONTEXT}}', context);
+
+    // Append lesson context and attachments if present
+    if (lessonContextSection) {
+      prompt += '\n' + lessonContextSection;
+    }
+    if (attachmentContext) {
+      prompt += '\n' + attachmentContext;
+    }
+
+    return prompt;
+  }
+
+  // ============================================================================
   // CHAT & WELCOME
   // ============================================================================
 
@@ -449,9 +602,11 @@ ${sessionNotesSection}
   private welcomeCache: Map<string, { welcome: WelcomeResponse; timestamp: number }> = new Map();
   private readonly WELCOME_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  async generateWelcome(traineeId: string): Promise<WelcomeResponse> {
+  async generateWelcome(traineeId: string, teacherName?: string): Promise<WelcomeResponse> {
+    const cacheKey = this.getSessionKey(traineeId, teacherName);
+
     // Check cache first
-    const cached = this.welcomeCache.get(traineeId);
+    const cached = this.welcomeCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.WELCOME_CACHE_TTL) {
       return cached.welcome;
     }
@@ -467,8 +622,12 @@ ${sessionNotesSection}
 
     // Try to get AI-generated greeting with a short timeout
     try {
+      const greetingGenerator = teacherName && isValidTeacherName(teacherName)
+        ? this.generatePersonaGreeting(profile, isArabic, teacherName as TeacherPersonaName)
+        : this.generateAIGreeting(profile, isArabic);
+
       const aiGreeting = await Promise.race([
-        this.generateAIGreeting(profile, isArabic),
+        greetingGenerator,
         new Promise<string>((_, reject) =>
           setTimeout(() => reject(new Error('timeout')), 8000) // 8 second timeout
         ),
@@ -510,7 +669,7 @@ ${sessionNotesSection}
     };
 
     // Cache the result
-    this.welcomeCache.set(traineeId, { welcome, timestamp: Date.now() });
+    this.welcomeCache.set(cacheKey, { welcome, timestamp: Date.now() });
 
     // Sync profile in background (don't wait)
     this.syncProfileWithPerformance(traineeId).catch(() => {
@@ -590,7 +749,27 @@ Be warm and professional.`;
     });
   }
 
-  async sendMessage(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext): Promise<ChatResponse> {
+  /**
+   * Generate persona-specific greeting
+   */
+  private async generatePersonaGreeting(profile: TraineeProfile, isArabic: boolean, teacherName: TeacherPersonaName): Promise<string> {
+    const persona = TEACHER_PERSONAS[teacherName];
+    const welcomePrompt = isArabic ? persona.welcomePromptAr : persona.welcomePromptEn;
+
+    const prompt = `${welcomePrompt}
+
+Trainee name: ${profile.firstName} ${profile.lastName}
+Sessions completed: ${profile.totalSessions}
+Average score: ${profile.averageScore}%`;
+
+    return this.fallbackProvider.complete({
+      prompt,
+      maxTokens: 300,
+      temperature: 0.7,
+    });
+  }
+
+  async sendMessage(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext, teacherName?: string): Promise<ChatResponse> {
     // Get profile for context
     const profile = await this.getOrCreateProfile(traineeId);
     const profileMarkdown = this.generateProfileMarkdown(profile);
@@ -648,9 +827,16 @@ ${lessonContext.videoDurationMinutes ? `- **Video Duration**: ${lessonContext.vi
 `;
     }
 
-    // System prompt with profile context
-    const systemPrompt = isArabic
-      ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.
+    // System prompt: use persona-specific if teacherName provided, else generic
+    let systemPrompt: string;
+    if (teacherName && isValidTeacherName(teacherName)) {
+      systemPrompt = await this.buildPersonaSystemPrompt(
+        traineeId, teacherName as TeacherPersonaName, profileMarkdown,
+        lessonContextSection, attachmentContext, isArabic, message
+      );
+    } else {
+      systemPrompt = isArabic
+        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.
 
 ## ملف المتدرب (استخدمه لتخصيص ردودك):
 ${profileMarkdown}
@@ -664,7 +850,7 @@ ${lessonContextSection}
 5. شجع المتدرب وادعمه مع تقديم نقد بناء
 6. إذا طُلب منك موضوع خارج العقارات، وجه المحادثة بلطف للتركيز على التدريب
 ${attachmentContext}`
-      : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.
+        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.
 
 ## Trainee Profile (use this to personalize your responses):
 ${profileMarkdown}
@@ -678,6 +864,7 @@ ${lessonContextSection}
 5. Provide constructive feedback while being supportive
 6. If asked about off-topic subjects, gently redirect to training focus
 ${attachmentContext}`;
+    }
 
     // Generate response using Gemini 2.0 Flash for low-latency
     const response = await this.fallbackProvider.complete({
@@ -710,7 +897,7 @@ ${attachmentContext}`;
     }
 
     // Update session with lesson context for learning insights
-    this.updateSession(traineeId, message, response, lessonContext);
+    this.updateSession(traineeId, message, response, lessonContext, teacherName);
 
     return {
       message: response,
@@ -728,7 +915,8 @@ ${attachmentContext}`;
     traineeId: string,
     message: string,
     attachments?: FileAttachment[],
-    lessonContext?: LessonContext
+    lessonContext?: LessonContext,
+    teacherName?: string
   ): AsyncGenerator<StreamingChatResponse, void, unknown> {
     // Get profile for context
     const profile = await this.getOrCreateProfile(traineeId);
@@ -755,10 +943,18 @@ ${attachmentContext}`;
         : `\n\n## Current Lesson Context:\n- **Lesson**: ${lessonContext.lessonName}\n- **Description**: ${lessonContext.lessonDescription}\n- **Course**: ${lessonContext.courseName}`;
     }
 
-    // System prompt with profile context
-    const systemPrompt = isArabic
-      ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي${attachmentContext}`
-      : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market${attachmentContext}`;
+    // System prompt: use persona-specific if teacherName provided, else generic
+    let systemPrompt: string;
+    if (teacherName && isValidTeacherName(teacherName)) {
+      systemPrompt = await this.buildPersonaSystemPrompt(
+        traineeId, teacherName as TeacherPersonaName, profileMarkdown,
+        lessonContextSection, attachmentContext, isArabic, message
+      );
+    } else {
+      systemPrompt = isArabic
+        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي${attachmentContext}`
+        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market${attachmentContext}`;
+    }
 
     let fullMessage = '';
     let firstSentenceComplete = false;
@@ -819,7 +1015,7 @@ ${attachmentContext}`;
       }
 
       // Update session
-      this.updateSession(traineeId, message, fullMessage, lessonContext);
+      this.updateSession(traineeId, message, fullMessage, lessonContext, teacherName);
 
       // Send final done event with full message and metadata
       yield {
@@ -918,13 +1114,15 @@ Answer in JSON only:
     }
   }
 
-  private updateSession(traineeId: string, userMessage: string, assistantMessage: string, lessonContext?: LessonContext): void {
-    let session = this.sessionCache.get(traineeId);
+  private updateSession(traineeId: string, userMessage: string, assistantMessage: string, lessonContext?: LessonContext, teacherName?: string): void {
+    const sessionKey = this.getSessionKey(traineeId, teacherName);
+    let session = this.sessionCache.get(sessionKey);
 
     if (!session) {
       session = {
         id: `session-${traineeId}-${Date.now()}`,
         traineeId,
+        teacherName,
         messages: [],
         startedAt: new Date(),
         lastMessageAt: new Date(),
@@ -953,7 +1151,7 @@ Answer in JSON only:
       session.topic = lessonContext.lessonName;
     }
 
-    this.sessionCache.set(traineeId, session);
+    this.sessionCache.set(sessionKey, session);
 
     // Update trainee profile with learning insights (async, don't wait)
     this.updateLearningInsights(traineeId, userMessage, assistantMessage, lessonContext).catch(() => {
@@ -1092,10 +1290,22 @@ Respond in JSON only:
     }
   }
 
-  async getSessionHistory(traineeId: string, limit: number = 10): Promise<TeacherSession[]> {
+  async getAssignedTeacher(traineeId: string): Promise<{ assignedTeacher: string | null; assignedTeacherAt: Date | null }> {
+    const trainee = await this.prisma.trainee.findUnique({
+      where: { id: traineeId },
+      select: { assignedTeacher: true, assignedTeacherAt: true },
+    });
+    return {
+      assignedTeacher: trainee?.assignedTeacher || null,
+      assignedTeacherAt: trainee?.assignedTeacherAt || null,
+    };
+  }
+
+  async getSessionHistory(traineeId: string, limit: number = 10, teacherName?: string): Promise<TeacherSession[]> {
     // For now, return from cache
     // In production, this would query the database
-    const session = this.sessionCache.get(traineeId);
+    const sessionKey = this.getSessionKey(traineeId, teacherName);
+    const session = this.sessionCache.get(sessionKey);
     return session ? [session] : [];
   }
 

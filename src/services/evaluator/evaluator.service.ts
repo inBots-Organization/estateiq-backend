@@ -35,6 +35,14 @@ const TEACHER_PROFILES: Record<AITeacherName, Omit<TeacherAssignment, 'assignmen
       en: 'Advanced Teacher - Specializes in refining expert skills and professional excellence',
     },
   },
+  abdullah: {
+    teacherName: 'abdullah',
+    teacherDisplayName: { ar: 'عبدالله', en: 'Abdullah' },
+    teacherDescription: {
+      ar: 'مرشد النمو - يحلل أداءك ويوجهك بناءً على البيانات',
+      en: 'Growth Mentor - Analyzes your performance and guides you with data-driven insights',
+    },
+  },
 };
 
 @injectable()

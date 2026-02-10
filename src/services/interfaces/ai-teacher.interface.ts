@@ -78,6 +78,7 @@ export interface FileAttachment {
 export interface TeacherSession {
   id: string;
   traineeId: string;
+  teacherName?: string;
   messages: ChatMessage[];
   topic?: string;
   startedAt: Date;
@@ -153,10 +154,10 @@ export interface IAITeacherService {
   syncProfileWithPerformance(traineeId: string): Promise<TraineeProfile>;
 
   // Session Management
-  generateWelcome(traineeId: string): Promise<WelcomeResponse>;
-  sendMessage(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext): Promise<ChatResponse>;
-  sendMessageStream(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext): AsyncGenerator<StreamingChatResponse>;
-  getSessionHistory(traineeId: string, limit?: number): Promise<TeacherSession[]>;
+  generateWelcome(traineeId: string, teacherName?: string): Promise<WelcomeResponse>;
+  sendMessage(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext, teacherName?: string): Promise<ChatResponse>;
+  sendMessageStream(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext, teacherName?: string): AsyncGenerator<StreamingChatResponse>;
+  getSessionHistory(traineeId: string, limit?: number, teacherName?: string): Promise<TeacherSession[]>;
 
   // Voice
   textToSpeech(text: string, language: 'ar' | 'en'): Promise<string>; // Returns base64 audio

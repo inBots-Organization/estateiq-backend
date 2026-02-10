@@ -22,7 +22,7 @@ export const TEACHER_VOICES: Record<string, TeacherVoiceConfig> = {
     },
   },
   noura: {
-    voiceId: 'EXAVITQu4vr4xnSDxMaL', // Female voice - Sarah (expressive)
+    voiceId: 'tavIIPLplRB883FzWU0V', // Mona - Arabic female voice (Egyptian dialect)
     personality: 'challenging',
     welcomeMessage: {
       ar: 'مرحباً! أنا نورة، وأنا هنا عشان أتحداك وأطور مهاراتك. مستعد للتحدي؟',

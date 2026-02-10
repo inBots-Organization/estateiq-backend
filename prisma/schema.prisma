@@ -522,8 +522,8 @@ model QuizAttempt {
   timeSpentSeconds Int?           @map("time_spent_seconds")
   status           String         @default("in_progress")
 
-  quiz             Quiz           @relation(fields: [quizId], references: [id])
-  trainee          Trainee        @relation(fields: [traineeId], references: [id])
+  quiz             Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  trainee          Trainee        @relation(fields: [traineeId], references: [id], onDelete: Cascade)
   responses        QuizResponse[]
 
   @@index([quizId, traineeId])
@@ -540,7 +540,7 @@ model QuizResponse {
   answeredAt       DateTime    @default(now()) @map("answered_at")
 
   attempt          QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question         Question    @relation(fields: [questionId], references: [id])
+  question         Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([attemptId, questionId])
   @@map("quiz_responses")

@@ -161,6 +161,13 @@ export class AITeacherController {
       this.preRenderTTS.bind(this)
     );
 
+    // Welcome audio for teacher persona (instant pre-defined message)
+    this.router.get(
+      '/tts/welcome',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.getWelcomeAudio.bind(this)
+    );
+
     this.router.post(
       '/stt',
       authMiddleware(['trainee', 'trainer', 'org_admin']),
@@ -443,17 +450,44 @@ export class AITeacherController {
 
   private async textToSpeech(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { text, language } = req.body;
+      const { text, language, teacherName } = req.body;
 
       if (!text || typeof text !== 'string') {
         res.status(400).json({ error: 'Text is required' });
         return;
       }
 
+      if (teacherName && !isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+        return;
+      }
+
       const lang = language === 'en' ? 'en' : 'ar';
-      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang);
+      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang, teacherName);
 
       res.status(200).json({ audio: audioBase64 });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get welcome audio for a teacher persona
+   * Uses pre-defined welcome messages for instant response
+   * GET /api/ai-teacher/tts/welcome?teacherName=ahmed&language=ar
+   */
+  private async getWelcomeAudio(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const teacherName = req.query.teacherName as string || 'ahmed';
+      const language = (req.query.language as string) === 'en' ? 'en' : 'ar';
+
+      if (!isValidTeacherName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+        return;
+      }
+
+      const result = await this.aiTeacherService.generateWelcomeAudio(teacherName, language);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

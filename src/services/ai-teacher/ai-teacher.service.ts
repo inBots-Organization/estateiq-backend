@@ -28,6 +28,7 @@ import { ILLMProvider } from '../../providers/llm/llm-provider.interface';
 import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
 import { BrainService } from '../brain/brain.service';
 import { TEACHER_PERSONAS, TeacherPersonaName, isValidTeacherName } from './teacher-personas.config';
+import { getTeacherVoiceId, getTeacherWelcome } from '../../config/teacher-voices.config';
 
 // Constants
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'trainee-profiles');
@@ -1313,12 +1314,21 @@ Respond in JSON only:
   // VOICE SYNTHESIS
   // ============================================================================
 
-  async textToSpeech(text: string, language: 'ar' | 'en'): Promise<string> {
+  /**
+   * Convert text to speech using ElevenLabs
+   * @param text - Text to convert
+   * @param language - Language code ('ar' or 'en')
+   * @param teacherName - Optional teacher name for persona-specific voice
+   */
+  async textToSpeech(text: string, language: 'ar' | 'en', teacherName?: string): Promise<string> {
     if (!this.elevenLabsApiKey) {
       throw new Error('ElevenLabs API key not configured');
     }
 
-    const voiceId = VOICE_IDS[language];
+    // Use teacher-specific voice if provided, otherwise fallback to language default
+    const voiceId = teacherName
+      ? getTeacherVoiceId(teacherName)
+      : VOICE_IDS[language];
 
     // Use eleven_turbo_v2_5 for faster generation with good quality
     // For Arabic, use eleven_multilingual_v2 for better pronunciation
@@ -1349,6 +1359,19 @@ Respond in JSON only:
 
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer).toString('base64');
+  }
+
+  /**
+   * Generate welcome message audio for a teacher persona
+   * Uses pre-defined welcome messages from config for instant response
+   */
+  async generateWelcomeAudio(teacherName: string, language: 'ar' | 'en'): Promise<{
+    message: string;
+    audio: string;
+  }> {
+    const welcomeMessage = getTeacherWelcome(teacherName, language);
+    const audio = await this.textToSpeech(welcomeMessage, language, teacherName);
+    return { message: welcomeMessage, audio };
   }
 
   async speechToText(audioBuffer: Buffer, language: 'ar' | 'en'): Promise<string> {

@@ -62,10 +62,10 @@ export class FlashcardController {
       this.listDecksForAdmin.bind(this)
     );
 
-    // POST /api/flashcards/decks/generate — AI-generate deck
+    // POST /api/flashcards/decks/generate — AI-generate deck (trainees can generate for themselves)
     this.router.post(
       '/decks/generate',
-      authMiddleware(['trainer', 'org_admin']),
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
       validateRequest(GenerateDeckSchema),
       this.generateDeck.bind(this)
     );

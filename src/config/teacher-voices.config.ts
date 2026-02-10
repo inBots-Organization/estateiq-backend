@@ -22,11 +22,11 @@ export const TEACHER_VOICES: Record<string, TeacherVoiceConfig> = {
     },
   },
   noura: {
-    voiceId: 'tavIIPLplRB883FzWU0V', // Mona - Arabic female voice (Egyptian dialect)
+    voiceId: 'meAbY2VpJkt1q46qk56T', // Hoda - Egyptian Arabic female voice (clear feminine)
     personality: 'challenging',
     welcomeMessage: {
-      ar: 'مرحباً! أنا نورة، وأنا هنا عشان أتحداك وأطور مهاراتك. مستعد للتحدي؟',
-      en: "Hello! I'm Noura, and I'm here to challenge and develop your skills. Ready for the challenge?",
+      ar: 'السلام عليكم! أنا نورة، معلمتك الخاصة في عالم العقارات. أنا هنا أساعدك وأطور مهاراتك خطوة بخطوة. يلا نبدأ رحلتنا!',
+      en: "Peace be upon you! I'm Noura, your personal real estate teacher. I'm here to help and develop your skills step by step. Let's start our journey!",
     },
   },
   anas: {

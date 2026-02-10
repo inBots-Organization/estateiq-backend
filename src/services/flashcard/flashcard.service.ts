@@ -299,10 +299,13 @@ export class FlashcardService implements IFlashcardService {
 
     const deck = await this.createDeck(creatorId, orgId, deckData);
 
-    // Mark as AI generated
-    await this.flashcardRepo.updateDeck(deck.id, { generationType: 'ai_generated' } as any);
+    // Mark as AI generated AND auto-publish for immediate use
+    await this.flashcardRepo.updateDeck(deck.id, {
+      generationType: 'ai_generated',
+      isPublished: true,
+    } as any);
 
-    return { ...deck, generationType: 'ai_generated' };
+    return { ...deck, generationType: 'ai_generated', isPublished: true };
   }
 
   // ==========================================

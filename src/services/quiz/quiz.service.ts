@@ -372,10 +372,13 @@ export class QuizService implements IQuizService {
 
     const quiz = await this.createQuiz(creatorId, orgId, quizData);
 
-    // Mark as AI generated
-    await this.quizRepository.update(quiz.id, { quizType: 'ai_generated' } as any);
+    // Mark as AI generated AND auto-publish for immediate use
+    await this.quizRepository.update(quiz.id, {
+      quizType: 'ai_generated',
+      isPublished: true,
+    } as any);
 
-    return { ...quiz, quizType: 'ai_generated' };
+    return { ...quiz, quizType: 'ai_generated', isPublished: true };
   }
 
   // ==========================================

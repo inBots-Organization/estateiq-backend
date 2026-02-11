@@ -38,3 +38,4 @@ backup-data.json
 # Temp
 *.tmp
 *.temp
+# Trigger rebuild

@@ -1,12 +1,13 @@
 /**
- * Update avatar URLs for default teachers with big-ears style avatars
- * Clean, friendly, professional-looking cartoon avatars
+ * Update avatar URLs for default teachers
+ * Noura: Custom Saudi woman with hijab (local file)
+ * Others: big-ears style avatars
  * Usage: node scripts/update-avatars.js
  */
 
 const { Client } = require('pg');
 
-// Big-ears style avatars - clean, friendly, professional cartoon style
+// Avatar URLs - Noura uses custom local file, others use DiceBear
 const DEFAULT_AVATARS = [
   {
     name: 'ahmed',
@@ -15,8 +16,8 @@ const DEFAULT_AVATARS = [
   },
   {
     name: 'noura',
-    // Noura: Sales strategy teacher - purple theme
-    avatarUrl: 'https://api.dicebear.com/9.x/big-ears/svg?seed=NouraTeacher&backgroundColor=8b5cf6',
+    // Noura: Custom Saudi woman with hijab
+    avatarUrl: '/avatars/noura.avif',
   },
   {
     name: 'anas',
@@ -71,8 +72,9 @@ async function updateAvatars() {
       console.log(`    URL: ${row.avatar_url}`);
     });
 
-    console.log('\n✅ Avatars updated successfully with big-ears style!');
-    console.log('   Clean, friendly, professional cartoon avatars');
+    console.log('\n✅ Avatars updated successfully!');
+    console.log('   - نورة (Noura): Custom Saudi woman with hijab');
+    console.log('   - Others: big-ears style avatars');
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);

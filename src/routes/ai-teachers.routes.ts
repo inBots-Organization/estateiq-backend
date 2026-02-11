@@ -358,6 +358,195 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STATIC ROUTES - Must be defined BEFORE /:id routes to avoid conflicts
+// ═══════════════════════════════════════════════════════════════════════════
+
+// POST /api/admin/ai-teachers/seed - Seed default teachers (utility endpoint)
+router.post('/seed', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Check if teachers already exist
+    const existingCount = await prisma.aITeacher.count({
+      where: { organizationId },
+    });
+
+    if (existingCount > 0) {
+      return res.status(400).json({ error: 'Teachers already exist for this organization' });
+    }
+
+    // Create default teachers
+    const teachers = await Promise.all(
+      DEFAULT_TEACHERS.map((teacher) =>
+        prisma.aITeacher.create({
+          data: {
+            ...teacher,
+            organizationId,
+          },
+        })
+      )
+    );
+
+    res.status(201).json({ teachers, message: `${teachers.length} default teachers created` });
+  } catch (error) {
+    console.error('Error seeding teachers:', error);
+    res.status(500).json({ error: 'Failed to seed teachers' });
+  }
+});
+
+// POST /api/admin/ai-teachers/resync - Update default teachers with latest prompts
+router.post('/resync', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Update each default teacher with latest prompts
+    const results = await Promise.all(
+      DEFAULT_TEACHERS.map(async (teacher) => {
+        const existing = await prisma.aITeacher.findFirst({
+          where: { organizationId, name: teacher.name },
+        });
+
+        if (existing) {
+          // Update with new prompts if they're currently empty
+          return prisma.aITeacher.update({
+            where: { id: existing.id },
+            data: {
+              // Only update prompts if they're empty
+              ...((!existing.systemPromptAr || existing.systemPromptAr.trim() === '') && { systemPromptAr: teacher.systemPromptAr }),
+              ...((!existing.systemPromptEn || existing.systemPromptEn.trim() === '') && { systemPromptEn: teacher.systemPromptEn }),
+              ...((!existing.welcomeMessageAr || existing.welcomeMessageAr.trim() === '') && { welcomeMessageAr: teacher.welcomeMessageAr }),
+              ...((!existing.welcomeMessageEn || existing.welcomeMessageEn.trim() === '') && { welcomeMessageEn: teacher.welcomeMessageEn }),
+              // Update descriptions if empty
+              ...((!existing.descriptionAr || existing.descriptionAr.trim() === '') && { descriptionAr: teacher.descriptionAr }),
+              ...((!existing.descriptionEn || existing.descriptionEn.trim() === '') && { descriptionEn: teacher.descriptionEn }),
+            },
+          });
+        }
+        return null;
+      })
+    );
+
+    const updatedCount = results.filter(r => r !== null).length;
+    res.json({ message: `Updated ${updatedCount} default teachers with prompts`, updatedCount });
+  } catch (error) {
+    console.error('Error resyncing teachers:', error);
+    res.status(500).json({ error: 'Failed to resync teachers' });
+  }
+});
+
+// POST /api/admin/ai-teachers/reset-evaluations - Reset all trainee evaluations
+router.post('/reset-evaluations', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Reset all trainees in this organization:
+    // - Clear assignedTeacher and assignedTeacherId
+    // - Clear currentSkillLevel
+    // - Clear lastDiagnosticAt
+    const result = await prisma.trainee.updateMany({
+      where: { organizationId },
+      data: {
+        assignedTeacher: null,
+        assignedTeacherId: null,
+        assignedTeacherAt: null,
+        currentSkillLevel: null,
+        lastDiagnosticAt: null,
+      },
+    });
+
+    // Also delete all daily skill reports for this organization's trainees
+    const traineeIds = await prisma.trainee.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+
+    const deletedReports = await prisma.dailySkillReport.deleteMany({
+      where: {
+        traineeId: { in: traineeIds.map(t => t.id) },
+      },
+    });
+
+    // Delete all diagnostic sessions for this organization's trainees
+    const deletedSessions = await prisma.diagnosticSession.deleteMany({
+      where: {
+        traineeId: { in: traineeIds.map(t => t.id) },
+      },
+    });
+
+    res.json({
+      message: `Reset ${result.count} trainee evaluations successfully`,
+      resetCount: result.count,
+      deletedReports: deletedReports.count,
+      deletedSessions: deletedSessions.count,
+    });
+  } catch (error) {
+    console.error('Error resetting evaluations:', error);
+    res.status(500).json({ error: 'Failed to reset evaluations' });
+  }
+});
+
+// POST /api/admin/ai-teachers/force-resync - Force update all default teachers with latest prompts
+router.post('/force-resync', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Force update each default teacher with latest prompts (overwrite existing)
+    const results = await Promise.all(
+      DEFAULT_TEACHERS.map(async (teacher) => {
+        const existing = await prisma.aITeacher.findFirst({
+          where: { organizationId, name: teacher.name },
+        });
+
+        if (existing) {
+          return prisma.aITeacher.update({
+            where: { id: existing.id },
+            data: {
+              systemPromptAr: teacher.systemPromptAr,
+              systemPromptEn: teacher.systemPromptEn,
+              welcomeMessageAr: teacher.welcomeMessageAr,
+              welcomeMessageEn: teacher.welcomeMessageEn,
+              descriptionAr: teacher.descriptionAr,
+              descriptionEn: teacher.descriptionEn,
+            },
+          });
+        }
+        return null;
+      })
+    );
+
+    const updatedCount = results.filter(r => r !== null).length;
+    res.json({ message: `Force-updated ${updatedCount} default teachers with prompts`, updatedCount });
+  } catch (error) {
+    console.error('Error force-resyncing teachers:', error);
+    res.status(500).json({ error: 'Failed to force-resync teachers' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DYNAMIC ROUTES - These use :id parameter
+// ═══════════════════════════════════════════════════════════════════════════
+
 // GET /api/admin/ai-teachers/:id - Get single AI teacher with details
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -839,187 +1028,6 @@ router.post('/:id/avatar', upload.single('avatar'), async (req: Request, res: Re
   } catch (error) {
     console.error('Error uploading avatar:', error);
     res.status(500).json({ error: 'Failed to upload avatar' });
-  }
-});
-
-// POST /api/admin/ai-teachers/seed - Seed default teachers (utility endpoint)
-router.post('/seed', async (req: Request, res: Response) => {
-  try {
-    const prisma = container.resolve<PrismaClient>('PrismaClient');
-    const organizationId = await getOrganizationId(req);
-
-    if (!organizationId) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
-
-    // Check if teachers already exist
-    const existingCount = await prisma.aITeacher.count({
-      where: { organizationId },
-    });
-
-    if (existingCount > 0) {
-      return res.status(400).json({ error: 'Teachers already exist for this organization' });
-    }
-
-    // Create default teachers
-    const teachers = await Promise.all(
-      DEFAULT_TEACHERS.map((teacher) =>
-        prisma.aITeacher.create({
-          data: {
-            ...teacher,
-            organizationId,
-          },
-        })
-      )
-    );
-
-    res.status(201).json({ teachers, message: `${teachers.length} default teachers created` });
-  } catch (error) {
-    console.error('Error seeding teachers:', error);
-    res.status(500).json({ error: 'Failed to seed teachers' });
-  }
-});
-
-// POST /api/admin/ai-teachers/resync - Update default teachers with latest prompts
-router.post('/resync', async (req: Request, res: Response) => {
-  try {
-    const prisma = container.resolve<PrismaClient>('PrismaClient');
-    const organizationId = await getOrganizationId(req);
-
-    if (!organizationId) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
-
-    // Update each default teacher with latest prompts
-    const results = await Promise.all(
-      DEFAULT_TEACHERS.map(async (teacher) => {
-        const existing = await prisma.aITeacher.findFirst({
-          where: { organizationId, name: teacher.name },
-        });
-
-        if (existing) {
-          // Update with new prompts if they're currently empty
-          return prisma.aITeacher.update({
-            where: { id: existing.id },
-            data: {
-              // Only update prompts if they're empty
-              ...((!existing.systemPromptAr || existing.systemPromptAr.trim() === '') && { systemPromptAr: teacher.systemPromptAr }),
-              ...((!existing.systemPromptEn || existing.systemPromptEn.trim() === '') && { systemPromptEn: teacher.systemPromptEn }),
-              ...((!existing.welcomeMessageAr || existing.welcomeMessageAr.trim() === '') && { welcomeMessageAr: teacher.welcomeMessageAr }),
-              ...((!existing.welcomeMessageEn || existing.welcomeMessageEn.trim() === '') && { welcomeMessageEn: teacher.welcomeMessageEn }),
-              // Update descriptions if empty
-              ...((!existing.descriptionAr || existing.descriptionAr.trim() === '') && { descriptionAr: teacher.descriptionAr }),
-              ...((!existing.descriptionEn || existing.descriptionEn.trim() === '') && { descriptionEn: teacher.descriptionEn }),
-            },
-          });
-        }
-        return null;
-      })
-    );
-
-    const updatedCount = results.filter(r => r !== null).length;
-    res.json({ message: `Updated ${updatedCount} default teachers with prompts`, updatedCount });
-  } catch (error) {
-    console.error('Error resyncing teachers:', error);
-    res.status(500).json({ error: 'Failed to resync teachers' });
-  }
-});
-
-// POST /api/admin/ai-teachers/reset-evaluations - Reset all trainee evaluations
-router.post('/reset-evaluations', async (req: Request, res: Response) => {
-  try {
-    const prisma = container.resolve<PrismaClient>('PrismaClient');
-    const organizationId = await getOrganizationId(req);
-
-    if (!organizationId) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
-
-    // Reset all trainees in this organization:
-    // - Clear assignedTeacher and assignedTeacherId
-    // - Clear currentSkillLevel
-    // - Clear lastDiagnosticAt
-    const result = await prisma.trainee.updateMany({
-      where: { organizationId },
-      data: {
-        assignedTeacher: null,
-        assignedTeacherId: null,
-        assignedTeacherAt: null,
-        currentSkillLevel: null,
-        lastDiagnosticAt: null,
-      },
-    });
-
-    // Also delete all daily skill reports for this organization's trainees
-    const traineeIds = await prisma.trainee.findMany({
-      where: { organizationId },
-      select: { id: true },
-    });
-
-    const deletedReports = await prisma.dailySkillReport.deleteMany({
-      where: {
-        traineeId: { in: traineeIds.map(t => t.id) },
-      },
-    });
-
-    // Delete all diagnostic sessions for this organization's trainees
-    const deletedSessions = await prisma.diagnosticSession.deleteMany({
-      where: {
-        traineeId: { in: traineeIds.map(t => t.id) },
-      },
-    });
-
-    res.json({
-      message: `Reset ${result.count} trainee evaluations successfully`,
-      resetCount: result.count,
-      deletedReports: deletedReports.count,
-      deletedSessions: deletedSessions.count,
-    });
-  } catch (error) {
-    console.error('Error resetting evaluations:', error);
-    res.status(500).json({ error: 'Failed to reset evaluations' });
-  }
-});
-
-// POST /api/admin/ai-teachers/force-resync - Force update all default teachers with latest prompts
-router.post('/force-resync', async (req: Request, res: Response) => {
-  try {
-    const prisma = container.resolve<PrismaClient>('PrismaClient');
-    const organizationId = await getOrganizationId(req);
-
-    if (!organizationId) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
-
-    // Force update each default teacher with latest prompts (overwrite existing)
-    const results = await Promise.all(
-      DEFAULT_TEACHERS.map(async (teacher) => {
-        const existing = await prisma.aITeacher.findFirst({
-          where: { organizationId, name: teacher.name },
-        });
-
-        if (existing) {
-          return prisma.aITeacher.update({
-            where: { id: existing.id },
-            data: {
-              systemPromptAr: teacher.systemPromptAr,
-              systemPromptEn: teacher.systemPromptEn,
-              welcomeMessageAr: teacher.welcomeMessageAr,
-              welcomeMessageEn: teacher.welcomeMessageEn,
-              descriptionAr: teacher.descriptionAr,
-              descriptionEn: teacher.descriptionEn,
-            },
-          });
-        }
-        return null;
-      })
-    );
-
-    const updatedCount = results.filter(r => r !== null).length;
-    res.json({ message: `Force-updated ${updatedCount} default teachers with prompts`, updatedCount });
-  } catch (error) {
-    console.error('Error force-resyncing teachers:', error);
-    res.status(500).json({ error: 'Failed to force-resync teachers' });
   }
 });
 

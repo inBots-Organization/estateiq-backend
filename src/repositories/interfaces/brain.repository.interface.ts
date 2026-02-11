@@ -9,6 +9,9 @@ export interface CreateBrainDocumentData {
   gcsPath?: string;
   uploadedBy: string;
   metadata?: string;
+  contentLevel?: string;
+  targetPersona?: string | null;
+  tags?: string[];
 }
 
 export interface CreateBrainChunkData {

@@ -30,7 +30,7 @@ export class BrainService implements IBrainService {
   // ─── Upload & Process Document ────────────────────────────
 
   async uploadDocument(input: UploadDocumentInput): Promise<UploadDocumentOutput> {
-    const { file, fileName, mimeType, organizationId, uploadedBy } = input;
+    const { file, fileName, mimeType, organizationId, uploadedBy, contentLevel, targetPersona, tags } = input;
 
     // Validate file type
     if (!isSupportedFileType(mimeType)) {
@@ -70,6 +70,9 @@ export class BrainService implements IBrainService {
       fileType,
       fileSize: file.length,
       uploadedBy,
+      contentLevel: contentLevel || 'general',
+      targetPersona: targetPersona || null,
+      tags: tags || [],
     });
 
     // Process async (don't block the upload response)
@@ -171,6 +174,9 @@ export class BrainService implements IBrainService {
       isSystemDefault: doc.organizationId === SYSTEM_DEFAULT_ORG,
       uploadedBy: doc.uploadedBy,
       errorMessage: doc.errorMessage,
+      contentLevel: (doc.contentLevel || 'general') as BrainDocumentSummary['contentLevel'],
+      targetPersona: doc.targetPersona || null,
+      tags: doc.tags || [],
       createdAt: doc.createdAt,
     }));
 

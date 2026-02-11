@@ -2,6 +2,8 @@
 
 export type DocumentStatus = 'uploading' | 'processing' | 'ready' | 'failed';
 
+export type ContentLevel = 'beginner' | 'intermediate' | 'advanced' | 'professional' | 'general';
+
 export interface BrainDocumentSummary {
   id: string;
   title: string;
@@ -13,6 +15,9 @@ export interface BrainDocumentSummary {
   isSystemDefault: boolean;
   uploadedBy: string;
   errorMessage?: string | null;
+  contentLevel: ContentLevel;
+  targetPersona?: string | null;
+  tags: string[];
   createdAt: Date;
 }
 
@@ -24,6 +29,9 @@ export interface UploadDocumentInput {
   mimeType: string;
   organizationId: string;
   uploadedBy: string;
+  contentLevel?: ContentLevel;
+  targetPersona?: string;
+  tags?: string[];
 }
 
 export interface UploadDocumentOutput {

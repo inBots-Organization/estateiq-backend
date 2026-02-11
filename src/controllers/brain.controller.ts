@@ -90,12 +90,27 @@ export class BrainController {
         return;
       }
 
+      // Parse optional metadata from form fields
+      const contentLevel = req.body.contentLevel || 'general';
+      const targetPersona = req.body.targetPersona || null;
+      let tags: string[] = [];
+      if (req.body.tags) {
+        try {
+          tags = JSON.parse(req.body.tags);
+        } catch {
+          tags = [];
+        }
+      }
+
       const result = await this.brainService.uploadDocument({
         file: req.file.buffer,
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
         organizationId,
         uploadedBy: req.user!.userId,
+        contentLevel,
+        targetPersona,
+        tags,
       });
 
       res.status(201).json(result);

@@ -756,6 +756,12 @@ model BrainDocument {
   uploadedBy     String       @map("uploaded_by")
   metadata       String       @default("{}")
   errorMessage   String?      @map("error_message")
+  // Content level for teacher-specific retrieval
+  contentLevel   String       @default("general") @map("content_level") // beginner, intermediate, advanced, professional, general
+  // Target teacher persona (optional - for persona-specific content)
+  targetPersona  String?      @map("target_persona") // ahmed, noura, anas, abdullah
+  // Tags for better content organization
+  tags           String[]     @default([])
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
@@ -763,6 +769,7 @@ model BrainDocument {
 
   @@unique([organizationId, fileName])
   @@index([organizationId, status])
+  @@index([organizationId, contentLevel])
   @@map("brain_documents")
 }
 

@@ -563,6 +563,39 @@ router.delete('/employees/:id', async (req: Request, res: Response) => {
       // Delete assessment completions
       await tx.assessmentCompletion.deleteMany({ where: { traineeId: id } });
 
+      // Delete quiz responses first (they reference quiz attempts)
+      const quizAttempts = await tx.quizAttempt.findMany({
+        where: { traineeId: id },
+        select: { id: true },
+      });
+      const attemptIds = quizAttempts.map(a => a.id);
+      if (attemptIds.length > 0) {
+        await tx.quizResponse.deleteMany({ where: { attemptId: { in: attemptIds } } });
+      }
+      // Delete quiz attempts
+      await tx.quizAttempt.deleteMany({ where: { traineeId: id } });
+
+      // Delete flashcard proficiencies
+      await tx.cardProficiency.deleteMany({ where: { traineeId: id } });
+
+      // Delete AV content and feedback
+      const avContents = await tx.aVContent.findMany({
+        where: { traineeId: id },
+        select: { id: true },
+      });
+      const avContentIds = avContents.map(c => c.id);
+      if (avContentIds.length > 0) {
+        await tx.aVSlide.deleteMany({ where: { contentId: { in: avContentIds } } });
+        await tx.aVFeedback.deleteMany({ where: { contentId: { in: avContentIds } } });
+      }
+      await tx.aVContent.deleteMany({ where: { traineeId: id } });
+      // Also delete any feedback this user left on others' content
+      await tx.aVFeedback.deleteMany({ where: { traineeId: id } });
+
+      // Delete diagnostic sessions and daily skill reports
+      await tx.dailySkillReport.deleteMany({ where: { traineeId: id } });
+      await tx.diagnosticSession.deleteMany({ where: { traineeId: id } });
+
       // Finally delete the employee
       await tx.trainee.delete({ where: { id } });
     });

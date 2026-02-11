@@ -314,14 +314,19 @@ export class DiagnosticService implements IDiagnosticService {
     simulationSessionId?: string,
     quizAttemptId?: string,
   ): Promise<SkillScores> {
+    // IMPORTANT: Default scores are LOW (beginner level)
+    // Skills must be EARNED through actual performance
+    const DEFAULT_SCORE = 20; // Beginner level - must prove yourself
     const scores: SkillScores = {
-      communication: 50,
-      negotiation: 50,
-      objectionHandling: 50,
-      relationshipBuilding: 50,
-      productKnowledge: 50,
-      closingTechnique: 50,
+      communication: DEFAULT_SCORE,
+      negotiation: DEFAULT_SCORE,
+      objectionHandling: DEFAULT_SCORE,
+      relationshipBuilding: DEFAULT_SCORE,
+      productKnowledge: DEFAULT_SCORE,
+      closingTechnique: DEFAULT_SCORE,
     };
+
+    let hasActualData = false;
 
     // Pull from simulation analysis if available
     if (simulationSessionId) {
@@ -337,6 +342,7 @@ export class DiagnosticService implements IDiagnosticService {
               const val = metrics.skillScores[skill]?.score ?? metrics.skillScores[skill];
               if (typeof val === 'number') {
                 scores[skill] = val;
+                hasActualData = true;
               }
             }
           }
@@ -358,6 +364,7 @@ export class DiagnosticService implements IDiagnosticService {
               const val = summary.skillScores[skill]?.score ?? summary.skillScores[skill];
               if (typeof val === 'number') {
                 scores[skill] = val;
+                hasActualData = true;
               }
             }
           }
@@ -372,7 +379,14 @@ export class DiagnosticService implements IDiagnosticService {
       const attempt = await this.quizRepo.findAttemptById(quizAttemptId);
       if (attempt?.score !== null && attempt?.score !== undefined) {
         scores.productKnowledge = Math.round(attempt.score);
+        hasActualData = true;
       }
+    }
+
+    // If no actual data was found, keep all scores at DEFAULT_SCORE (beginner)
+    // This ensures users can't get high scores without doing actual work
+    if (!hasActualData) {
+      console.log('[DiagnosticService] No actual performance data found, using default beginner scores');
     }
 
     return scores;

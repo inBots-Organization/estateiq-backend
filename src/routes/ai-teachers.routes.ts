@@ -450,6 +450,48 @@ router.post('/resync', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ai-teachers/sync-avatars - Update default teachers with avatars from config
+router.post('/sync-avatars', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Update each default teacher with avatar URL from config
+    const results = await Promise.all(
+      DEFAULT_TEACHERS.map(async (teacher) => {
+        const existing = await prisma.aITeacher.findFirst({
+          where: { organizationId, name: teacher.name },
+        });
+
+        if (existing && teacher.avatarUrl) {
+          // Always update avatar URL to latest from config
+          return prisma.aITeacher.update({
+            where: { id: existing.id },
+            data: {
+              avatarUrl: teacher.avatarUrl,
+            },
+          });
+        }
+        return null;
+      })
+    );
+
+    const updatedCount = results.filter(r => r !== null).length;
+    res.json({
+      message: `Updated ${updatedCount} default teachers with avatars`,
+      updatedCount,
+      teachers: results.filter(r => r !== null).map(t => ({ name: t!.name, avatarUrl: t!.avatarUrl }))
+    });
+  } catch (error) {
+    console.error('Error syncing avatars:', error);
+    res.status(500).json({ error: 'Failed to sync avatars' });
+  }
+});
+
 // POST /api/admin/ai-teachers/reset-evaluations - Reset all trainee evaluations
 router.post('/reset-evaluations', async (req: Request, res: Response) => {
   try {

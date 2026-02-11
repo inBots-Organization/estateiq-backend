@@ -1,7 +1,9 @@
 import { injectable } from 'tsyringe';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const EMBEDDING_MODEL = 'models/text-embedding-004';
+// Use gemini-embedding-001 which is the available embedding model
+const EMBEDDING_MODEL = 'gemini-embedding-001';
+const EMBEDDING_MODEL_FULL = `models/${EMBEDDING_MODEL}`;
 const EMBEDDING_DIMENSION = 768;
 
 export interface IEmbeddingProvider {
@@ -12,7 +14,7 @@ export interface IEmbeddingProvider {
 
 /**
  * Gemini Embedding Provider
- * Uses text-embedding-004 (768 dimensions) via REST API.
+ * Uses gemini-embedding-001 (768 dimensions) via REST API.
  * Same pattern as the existing GeminiLLMProvider — no SDK needed.
  */
 @injectable()
@@ -57,14 +59,17 @@ export class GeminiEmbeddingProvider implements IEmbeddingProvider {
 
   private async batchEmbed(texts: string[], apiKey: string): Promise<number[][]> {
     const requests = texts.map(text => ({
-      model: EMBEDDING_MODEL,
+      model: EMBEDDING_MODEL_FULL,
       content: { parts: [{ text }] },
       taskType: 'RETRIEVAL_DOCUMENT',
       outputDimensionality: EMBEDDING_DIMENSION,
     }));
 
+    // Log the request for debugging
+    console.log(`[GeminiEmbedding] Calling batchEmbedContents with ${texts.length} texts`);
+
     const response = await fetch(
-      `${GEMINI_API_BASE}/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`,
+      `${GEMINI_API_BASE}/${EMBEDDING_MODEL_FULL}:batchEmbedContents?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +79,7 @@ export class GeminiEmbeddingProvider implements IEmbeddingProvider {
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`[GeminiEmbedding] API error: ${response.status}`, error);
       throw new Error(`Gemini Embedding API error: ${response.status} - ${error}`);
     }
 
@@ -94,13 +100,15 @@ export class GeminiEmbeddingProvider implements IEmbeddingProvider {
   async generateQueryEmbedding(text: string): Promise<number[]> {
     const apiKey = this.getApiKey();
 
+    console.log(`[GeminiEmbedding] Calling embedContent for query`);
+
     const response = await fetch(
-      `${GEMINI_API_BASE}/${EMBEDDING_MODEL}:embedContent?key=${apiKey}`,
+      `${GEMINI_API_BASE}/${EMBEDDING_MODEL_FULL}:embedContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: EMBEDDING_MODEL,
+          model: EMBEDDING_MODEL_FULL,
           content: { parts: [{ text }] },
           taskType: 'RETRIEVAL_QUERY',
           outputDimensionality: EMBEDDING_DIMENSION,
@@ -110,6 +118,7 @@ export class GeminiEmbeddingProvider implements IEmbeddingProvider {
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`[GeminiEmbedding] Query API error: ${response.status}`, error);
       throw new Error(`Gemini Embedding API error: ${response.status} - ${error}`);
     }
 

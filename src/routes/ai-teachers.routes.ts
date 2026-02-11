@@ -293,14 +293,13 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Organization context required' });
     }
 
-    // Get teachers with counts
-    const teachers = await prisma.aITeacher.findMany({
+    // Get teachers with document counts
+    let teachers = await prisma.aITeacher.findMany({
       where: { organizationId },
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: {
           select: {
-            assignedTrainees: true,
             documents: true,
           },
         },
@@ -319,7 +318,6 @@ router.get('/', async (req: Request, res: Response) => {
             include: {
               _count: {
                 select: {
-                  assignedTrainees: true,
                   documents: true,
                 },
               },
@@ -327,10 +325,33 @@ router.get('/', async (req: Request, res: Response) => {
           })
         )
       );
-      return res.json({ teachers: createdTeachers });
+      teachers = createdTeachers;
     }
 
-    res.json({ teachers });
+    // Count trainees for each teacher (including legacy assignedTeacher field)
+    const teachersWithCounts = await Promise.all(
+      teachers.map(async (teacher) => {
+        const traineeCount = await prisma.trainee.count({
+          where: {
+            organizationId,
+            OR: [
+              { assignedTeacherId: teacher.id },
+              { assignedTeacher: teacher.name }, // Legacy field
+            ],
+          },
+        });
+
+        return {
+          ...teacher,
+          _count: {
+            ...teacher._count,
+            assignedTrainees: traineeCount,
+          },
+        };
+      })
+    );
+
+    res.json({ teachers: teachersWithCounts });
   } catch (error) {
     console.error('Error fetching AI teachers:', error);
     res.status(500).json({ error: 'Failed to fetch AI teachers' });
@@ -599,8 +620,15 @@ router.get('/:id/trainees', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
+    // Search by both assignedTeacherId (new) AND assignedTeacher name (legacy)
     const trainees = await prisma.trainee.findMany({
-      where: { assignedTeacherId: id, organizationId },
+      where: {
+        organizationId,
+        OR: [
+          { assignedTeacherId: id },
+          { assignedTeacher: teacher.name }, // Legacy field - teacher name like "noura", "ahmed"
+        ],
+      },
       select: {
         id: true,
         firstName: true,

@@ -35,6 +35,7 @@ async function getOrganizationId(req: Request): Promise<string | null> {
 }
 
 // Default teachers configuration with full prompts
+// Avatar URLs use DiceBear API with professional Saudi-themed illustrations
 const DEFAULT_TEACHERS = [
   {
     name: 'ahmed',
@@ -42,6 +43,7 @@ const DEFAULT_TEACHERS = [
     displayNameEn: 'Ahmed',
     descriptionAr: 'معلم الأساسيات - صبور ومشجع، يساعدك على فهم أساسيات العقار',
     descriptionEn: 'Fundamentals Teacher - Patient & Encouraging, helps you understand real estate basics',
+    avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Ahmed&backgroundColor=3b82f6&skinColor=d08b5b&hair=short01&hairColor=0a0a0a&facialHair=beard&facialHairColor=0a0a0a&eyes=happy&mouth=smile&clothingColor=1e3a5f',
     personality: 'friendly',
     level: 'beginner',
     voiceId: 'onwK4e9ZLuTAKqWW03F9',
@@ -102,6 +104,7 @@ const DEFAULT_TEACHERS = [
     displayNameEn: 'Noura',
     descriptionAr: 'خبيرة المبيعات - حادة ومحترفة، تتحداك للوصول لأفضل أداء',
     descriptionEn: 'Sales Expert - Sharp & Professional, challenges you to reach peak performance',
+    avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Noura&backgroundColor=8b5cf6&skinColor=d08b5b&hair=long16&hairColor=0a0a0a&eyes=confident&mouth=serious&clothingColor=4c1d95&accessories=glasses',
     personality: 'challenging',
     level: 'intermediate',
     voiceId: 'meAbY2VpJkt1q46qk56T',
@@ -164,6 +167,7 @@ const DEFAULT_TEACHERS = [
     displayNameEn: 'Anas',
     descriptionAr: 'كوتش الإغلاق - خبير متقدم في إتمام الصفقات وتحليل السوق',
     descriptionEn: 'Senior Closer Coach - Advanced expert in closing deals and market analysis',
+    avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Anas&backgroundColor=10b981&skinColor=d08b5b&hair=short04&hairColor=0a0a0a&facialHair=scruff&facialHairColor=0a0a0a&eyes=squint&mouth=smirk&clothingColor=065f46',
     personality: 'professional',
     level: 'advanced',
     voiceId: 'pFZP5JQG7iQjIQuC4Bku',
@@ -226,6 +230,7 @@ const DEFAULT_TEACHERS = [
     displayNameEn: 'Abdullah',
     descriptionAr: 'مرشد النمو - حكيم ومحلل، يساعدك على تطوير مسارك المهني',
     descriptionEn: 'Growth Mentor - Wise & Analytical, helps you develop your career path',
+    avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=Abdullah&backgroundColor=f59e0b&skinColor=d08b5b&hair=short02&hairColor=3d3d3d&facialHair=full&facialHairColor=3d3d3d&eyes=open&mouth=smile&clothingColor=78350f&accessories=glasses',
     personality: 'wise',
     level: 'professional',
     voiceId: 'onwK4e9ZLuTAKqWW03F9',
@@ -760,15 +765,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
-    // Don't allow deleting default teachers
-    if (existing.isDefault) {
-      return res.status(400).json({ error: 'Cannot delete default teachers. You can deactivate them instead.' });
-    }
+    // Allow org admins to delete any teacher (including defaults) for their organization
+    // This gives them full control over their teacher roster
 
-    // Unassign trainees first
+    // Unassign trainees first (both new and legacy fields)
     await prisma.trainee.updateMany({
-      where: { assignedTeacherId: id },
-      data: { assignedTeacherId: null },
+      where: {
+        OR: [
+          { assignedTeacherId: id },
+          { assignedTeacher: existing.name },
+        ]
+      },
+      data: {
+        assignedTeacherId: null,
+        assignedTeacher: null,
+      },
     });
 
     // Unlink documents

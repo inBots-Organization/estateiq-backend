@@ -45,6 +45,8 @@ model Trainee {
   currentSkillLevel     String?                  @map("current_skill_level")
   assignedTeacher       String?                  @map("assigned_teacher")
   assignedTeacherAt     DateTime?                @map("assigned_teacher_at")
+  assignedTeacherId     String?                  @map("assigned_teacher_id")
+  assignedTeacherRecord AITeacher?               @relation(fields: [assignedTeacherId], references: [id])
   diagnosticSessions    DiagnosticSession[]
   dailySkillReports     DailySkillReport[]
 
@@ -168,6 +170,7 @@ model Organization {
   trainees         Trainee[]
   subscription     Subscription?
   apiUsage         ApiUsage[]
+  aiTeachers       AITeacher[]
 
   @@map("organizations")
 }
@@ -758,8 +761,11 @@ model BrainDocument {
   errorMessage   String?      @map("error_message")
   // Content level for teacher-specific retrieval
   contentLevel   String       @default("general") @map("content_level") // beginner, intermediate, advanced, professional, general
-  // Target teacher persona (optional - for persona-specific content)
+  // Target teacher persona (optional - for persona-specific content) - DEPRECATED: use teacherId
   targetPersona  String?      @map("target_persona") // ahmed, noura, anas, abdullah
+  // Direct link to AI Teacher
+  teacherId      String?      @map("teacher_id")
+  teacher        AITeacher?   @relation(fields: [teacherId], references: [id])
   // Tags for better content organization
   tags           String[]     @default([])
   createdAt      DateTime     @default(now()) @map("created_at")
@@ -770,6 +776,7 @@ model BrainDocument {
   @@unique([organizationId, fileName])
   @@index([organizationId, status])
   @@index([organizationId, contentLevel])
+  @@index([teacherId])
   @@map("brain_documents")
 }
 
@@ -788,4 +795,39 @@ model BrainChunk {
   @@index([organizationId])
   @@index([documentId])
   @@map("brain_chunks")
+}
+
+// ─── AI Teachers Management ────────────────────────
+
+model AITeacher {
+  id               String          @id @default(uuid())
+  organizationId   String          @map("organization_id")
+  name             String          // ahmed, noura, anas, abdullah, or custom
+  displayNameAr    String          @map("display_name_ar")
+  displayNameEn    String          @map("display_name_en")
+  descriptionAr    String?         @map("description_ar")
+  descriptionEn    String?         @map("description_en")
+  avatarUrl        String?         @map("avatar_url")
+  voiceId          String?         @map("voice_id")  // ElevenLabs voice ID
+  systemPromptAr   String?         @map("system_prompt_ar") @db.Text
+  systemPromptEn   String?         @map("system_prompt_en") @db.Text
+  welcomeMessageAr String?         @map("welcome_message_ar")
+  welcomeMessageEn String?         @map("welcome_message_en")
+  personality      String          @default("friendly") // friendly, challenging, professional, wise
+  level            String          @default("general")  // beginner, intermediate, advanced, professional, general
+  isActive         Boolean         @default(true) @map("is_active")
+  isDefault        Boolean         @default(false) @map("is_default") // System default teachers cannot be deleted
+  brainQueryPrefix String?         @map("brain_query_prefix")
+  contextSource    String          @default("brain") @map("context_source") // brain, user-history
+  sortOrder        Int             @default(0) @map("sort_order")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  documents        BrainDocument[] // Teacher-specific documents
+  assignedTrainees Trainee[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("ai_teachers")
 }

@@ -24,6 +24,7 @@ import notesRoutes from './routes/notes.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import settingsRoutes from './routes/settings.routes';
 import superAdminRoutes from './routes/super-admin.routes';
+import aiTeachersRoutes from './routes/ai-teachers.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error-handler.middleware';
@@ -90,6 +91,7 @@ apiRouter.use('/trainees', traineeController.router);
 apiRouter.use('/reports', reportController.router);
 apiRouter.use('/courses', courseController.router);
 apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/admin/ai-teachers', aiTeachersRoutes);
 apiRouter.use('/groups', groupRoutes);
 apiRouter.use('/notes', notesRoutes);
 apiRouter.use('/notifications', notificationsRoutes);

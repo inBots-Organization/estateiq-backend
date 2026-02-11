@@ -31,6 +31,7 @@ export interface UploadDocumentInput {
   uploadedBy: string;
   contentLevel?: ContentLevel;
   targetPersona?: string;
+  teacherId?: string;
   tags?: string[];
 }
 

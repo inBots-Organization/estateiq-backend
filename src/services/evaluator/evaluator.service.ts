@@ -217,27 +217,44 @@ Provide the evaluation JSON.`;
     }
   }
 
+  /**
+   * NEW Teacher Assignment Logic:
+   * - Weak/Beginner (0-40): Noura - تتحداهم وتدفعهم للتحسن
+   * - Slightly Higher (41-60): Anas - يطور مهاراتهم المتوسطة
+   * - Higher (61-80): Ahmed - يعلمهم الأساسيات المتقدمة بصبر
+   * - Professional (81-100): Abdullah - يرشدهم ويحلل أداءهم بحكمة
+   */
   getTeacherForScore(score: number): TeacherAssignment {
     let teacherName: AITeacherName;
     let reason: { ar: string; en: string };
 
     if (score <= 40) {
-      teacherName = 'ahmed';
-      reason = {
-        ar: 'بناءً على نتيجتك، ستتعلم الأساسيات مع أحمد لبناء قاعدة قوية',
-        en: 'Based on your score, you will learn fundamentals with Ahmed to build a strong foundation',
-      };
-    } else if (score <= 75) {
+      // Weak/Beginner → Noura (challenging, pushes them to improve)
       teacherName = 'noura';
       reason = {
-        ar: 'بناءً على نتيجتك، ستتعلم الاستراتيجيات المتقدمة مع نورة لتطوير مهاراتك',
-        en: 'Based on your score, you will learn advanced strategies with Noura to develop your skills',
+        ar: 'بناءً على مستواك الحالي، ستعمل مع نورة التي ستتحداك وتدفعك للتحسن السريع',
+        en: 'Based on your current level, you will work with Noura who will challenge you and push for rapid improvement',
       };
-    } else {
+    } else if (score <= 60) {
+      // Slightly Higher → Anas (develops intermediate skills)
       teacherName = 'anas';
       reason = {
-        ar: 'بناءً على نتيجتك المتميزة، ستعمل مع أنس لصقل مهاراتك والوصول للتميز المهني',
-        en: 'Based on your excellent score, you will work with Anas to refine your skills and achieve professional excellence',
+        ar: 'بناءً على مستواك، ستعمل مع أنس لتطوير مهاراتك في الإغلاق وتحليل السوق',
+        en: 'Based on your level, you will work with Anas to develop your closing and market analysis skills',
+      };
+    } else if (score <= 80) {
+      // Higher → Ahmed (patiently teaches advanced fundamentals)
+      teacherName = 'ahmed';
+      reason = {
+        ar: 'بناءً على مستواك الجيد، ستعمل مع أحمد لصقل أساسياتك وتعزيز نقاط قوتك',
+        en: 'Based on your good level, you will work with Ahmed to polish your fundamentals and strengthen your core skills',
+      };
+    } else {
+      // Professional (81-100) → Abdullah (wise mentor, data-driven guidance)
+      teacherName = 'abdullah';
+      reason = {
+        ar: 'بناءً على مستواك المتميز، ستعمل مع عبدالله مرشد النمو لتحليل أداءك والوصول للقمة',
+        en: 'Based on your excellent level, you will work with Abdullah the Growth Mentor for performance analysis and reaching the top',
       };
     }
 

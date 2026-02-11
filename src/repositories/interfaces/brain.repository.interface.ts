@@ -11,6 +11,7 @@ export interface CreateBrainDocumentData {
   metadata?: string;
   contentLevel?: string;
   targetPersona?: string | null;
+  teacherId?: string | null;
   tags?: string[];
 }
 

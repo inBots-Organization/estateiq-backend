@@ -93,6 +93,7 @@ export class BrainController {
       // Parse optional metadata from form fields
       const contentLevel = req.body.contentLevel || 'general';
       const targetPersona = req.body.targetPersona || null;
+      const teacherId = req.body.teacherId || null;
       let tags: string[] = [];
       if (req.body.tags) {
         try {
@@ -110,6 +111,7 @@ export class BrainController {
         uploadedBy: req.user!.userId,
         contentLevel,
         targetPersona,
+        teacherId,
         tags,
       });
 

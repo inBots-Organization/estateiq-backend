@@ -30,7 +30,7 @@ export class BrainService implements IBrainService {
   // ─── Upload & Process Document ────────────────────────────
 
   async uploadDocument(input: UploadDocumentInput): Promise<UploadDocumentOutput> {
-    const { file, fileName, mimeType, organizationId, uploadedBy, contentLevel, targetPersona, tags } = input;
+    const { file, fileName, mimeType, organizationId, uploadedBy, contentLevel, targetPersona, teacherId, tags } = input;
 
     // Validate file type
     if (!isSupportedFileType(mimeType)) {
@@ -72,6 +72,7 @@ export class BrainService implements IBrainService {
       uploadedBy,
       contentLevel: contentLevel || 'general',
       targetPersona: targetPersona || null,
+      teacherId: teacherId || null,
       tags: tags || [],
     });
 

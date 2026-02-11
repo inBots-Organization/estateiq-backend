@@ -925,6 +925,62 @@ router.post('/resync', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ai-teachers/reset-evaluations - Reset all trainee evaluations
+router.post('/reset-evaluations', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Reset all trainees in this organization:
+    // - Clear assignedTeacher and assignedTeacherId
+    // - Clear currentSkillLevel
+    // - Clear lastDiagnosticAt
+    const result = await prisma.trainee.updateMany({
+      where: { organizationId },
+      data: {
+        assignedTeacher: null,
+        assignedTeacherId: null,
+        assignedTeacherAt: null,
+        currentSkillLevel: null,
+        lastDiagnosticAt: null,
+      },
+    });
+
+    // Also delete all daily skill reports for this organization's trainees
+    const traineeIds = await prisma.trainee.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+
+    const deletedReports = await prisma.dailySkillReport.deleteMany({
+      where: {
+        traineeId: { in: traineeIds.map(t => t.id) },
+      },
+    });
+
+    // Delete all diagnostic sessions for this organization's trainees
+    const deletedSessions = await prisma.diagnosticSession.deleteMany({
+      where: {
+        traineeId: { in: traineeIds.map(t => t.id) },
+      },
+    });
+
+    res.json({
+      message: `Reset ${result.count} trainee evaluations successfully`,
+      resetCount: result.count,
+      deletedReports: deletedReports.count,
+      deletedSessions: deletedSessions.count,
+    });
+  } catch (error) {
+    console.error('Error resetting evaluations:', error);
+    res.status(500).json({ error: 'Failed to reset evaluations' });
+  }
+});
+
 // POST /api/admin/ai-teachers/force-resync - Force update all default teachers with latest prompts
 router.post('/force-resync', async (req: Request, res: Response) => {
   try {

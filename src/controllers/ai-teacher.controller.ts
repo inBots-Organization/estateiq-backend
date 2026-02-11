@@ -9,7 +9,7 @@ import { injectable, inject } from 'tsyringe';
 import { AITeacherService } from '../services/ai-teacher/ai-teacher.service';
 import { AVContentService } from '../services/av-content/av-content.service';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { isValidTeacherName } from '../services/ai-teacher/teacher-personas.config';
+import { isValidTeacherName, isValidVoiceName } from '../services/ai-teacher/teacher-personas.config';
 import multer, { FileFilterCallback } from 'multer';
 
 // Extend Request type to include file property
@@ -457,8 +457,8 @@ export class AITeacherController {
         return;
       }
 
-      if (teacherName && !isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+      if (teacherName && !isValidVoiceName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah, sara' });
         return;
       }
 
@@ -481,8 +481,8 @@ export class AITeacherController {
       const teacherName = req.query.teacherName as string || 'ahmed';
       const language = (req.query.language as string) === 'en' ? 'en' : 'ar';
 
-      if (!isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
+      if (!isValidVoiceName(teacherName)) {
+        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah, sara' });
         return;
       }
 

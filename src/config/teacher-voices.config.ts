@@ -13,6 +13,15 @@ export interface TeacherVoiceConfig {
 }
 
 export const TEACHER_VOICES: Record<string, TeacherVoiceConfig> = {
+  // Welcome bot for new trainees (no assessment yet)
+  sara: {
+    voiceId: 'XrExE9yKIg1WjnnlVkGX', // Arabic female - warm, welcoming Saudi voice
+    personality: 'friendly',
+    welcomeMessage: {
+      ar: 'يا هلا والله! أنا سارة، مرشدتك للبداية. سعيدة إنك معانا! خلينا نبدأ رحلتك ونكتشف مستواك عشان نختارلك أفضل معلم.',
+      en: "Hello and welcome! I'm Sara, your onboarding guide. So happy you're here! Let's start your journey and discover your level to match you with the best teacher.",
+    },
+  },
   ahmed: {
     voiceId: 'onwK4e9ZLuTAKqWW03F9', // Arabic male - friendly tone
     personality: 'friendly',

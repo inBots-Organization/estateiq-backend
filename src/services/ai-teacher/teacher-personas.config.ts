@@ -247,6 +247,13 @@ export const TEACHER_PERSONAS: Record<TeacherPersonaName, TeacherPersona> = {
 
 export const VALID_TEACHER_NAMES: TeacherPersonaName[] = ['ahmed', 'noura', 'anas', 'abdullah'];
 
+// All valid voice names (teachers + special bots like sara for onboarding)
+export const VALID_VOICE_NAMES = ['ahmed', 'noura', 'anas', 'abdullah', 'sara'];
+
 export function isValidTeacherName(name: string): name is TeacherPersonaName {
   return VALID_TEACHER_NAMES.includes(name as TeacherPersonaName);
+}
+
+export function isValidVoiceName(name: string): boolean {
+  return VALID_VOICE_NAMES.includes(name);
 }

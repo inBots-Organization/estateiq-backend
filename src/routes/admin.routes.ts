@@ -596,6 +596,17 @@ router.delete('/employees/:id', async (req: Request, res: Response) => {
       await tx.dailySkillReport.deleteMany({ where: { traineeId: id } });
       await tx.diagnosticSession.deleteMany({ where: { traineeId: id } });
 
+      // Delete brain documents uploaded by this user (chunks cascade automatically)
+      const brainDocs = await tx.brainDocument.findMany({
+        where: { uploadedBy: id },
+        select: { id: true },
+      });
+      const brainDocIds = brainDocs.map(d => d.id);
+      if (brainDocIds.length > 0) {
+        await tx.brainChunk.deleteMany({ where: { documentId: { in: brainDocIds } } });
+        await tx.brainDocument.deleteMany({ where: { uploadedBy: id } });
+      }
+
       // Finally delete the employee
       await tx.trainee.delete({ where: { id } });
     });

@@ -213,8 +213,11 @@ Based on this ${conversation.length}-turn conversation, provide your evaluation 
   }
 
   private normalizeSkillScore(skill: { score?: number; reasoning?: string; evidence?: string[]; tips?: string[] } | undefined): SkillEvaluation {
+    // IMPORTANT: Default score is LOW (20 = beginner level)
+    // Skills must be demonstrated in the conversation to earn higher scores
+    const DEFAULT_BEGINNER_SCORE = 20;
     return {
-      score: Math.min(100, Math.max(0, Math.round(skill?.score || 50))),
+      score: Math.min(100, Math.max(0, Math.round(skill?.score ?? DEFAULT_BEGINNER_SCORE))),
       reasoning: skill?.reasoning || 'Based on conversation analysis',
       evidence: skill?.evidence || [],
       tips: skill?.tips || [],
@@ -246,24 +249,26 @@ Based on this ${conversation.length}-turn conversation, provide your evaluation 
     avgResponseLength: number
   ): EvaluationResult {
     // Deterministic scoring based on conversation metrics
+    // IMPORTANT: Start LOW - skills must be EARNED through demonstrated performance
     const traineeMessages = conversation.filter(m => m.speaker === 'trainee');
     const turnCount = conversation.length;
 
-    // Base score starts at 50
-    let baseScore = 50;
+    // Base score starts at 15 (beginner level) - must earn higher scores
+    let baseScore = 15;
 
-    // Add points for conversation length (engagement)
-    if (turnCount >= 6) baseScore += 10;
-    if (turnCount >= 10) baseScore += 5;
+    // Add points for conversation length (engagement) - crucial for assessment
+    if (turnCount >= 6) baseScore += 15;
+    if (turnCount >= 10) baseScore += 10;
+    if (turnCount >= 15) baseScore += 5;
 
     // Add points for asking questions (discovery skills)
-    baseScore += Math.min(15, questionsAsked * 5);
+    baseScore += Math.min(20, questionsAsked * 6);
 
     // Add points for empathy
-    baseScore += Math.min(10, empathyStatements * 5);
+    baseScore += Math.min(15, empathyStatements * 5);
 
     // Add points for active listening
-    baseScore += Math.min(10, activeListeningIndicators * 5);
+    baseScore += Math.min(15, activeListeningIndicators * 5);
 
     // Balanced talk time is good (0.4-0.6 is ideal)
     if (talkTimeRatio >= 0.35 && talkTimeRatio <= 0.65) baseScore += 5;
@@ -275,23 +280,24 @@ Based on this ${conversation.length}-turn conversation, provide your evaluation 
     const grade = this.scoreToGrade(overallScore);
 
     // Calculate individual skill scores deterministically
+    // Start LOW (15-20) and require demonstrated behavior to earn points
     const communicationScore = Math.min(100, Math.max(0,
-      50 + (avgResponseLength > 30 ? 15 : 0) + (questionsAsked * 5)
+      15 + (avgResponseLength > 30 ? 20 : 0) + (questionsAsked * 8) + (turnCount > 5 ? 10 : 0)
     ));
     const negotiationScore = Math.min(100, Math.max(0,
-      45 + (turnCount > 8 ? 10 : 0) + (empathyStatements * 3)
+      15 + (turnCount > 8 ? 15 : 0) + (empathyStatements * 5) + (questionsAsked * 5)
     ));
     const objectionHandlingScore = Math.min(100, Math.max(0,
-      50 + (activeListeningIndicators * 8) + (empathyStatements * 5)
+      15 + (activeListeningIndicators * 12) + (empathyStatements * 8)
     ));
     const relationshipScore = Math.min(100, Math.max(0,
-      50 + (empathyStatements * 8) + (questionsAsked * 3)
+      15 + (empathyStatements * 12) + (questionsAsked * 5) + (turnCount > 6 ? 10 : 0)
     ));
     const productKnowledgeScore = Math.min(100, Math.max(0,
-      45 + (avgResponseLength > 50 ? 10 : 0) + (turnCount > 6 ? 10 : 0)
+      15 + (avgResponseLength > 50 ? 15 : 0) + (turnCount > 6 ? 15 : 0) + (questionsAsked * 3)
     ));
     const closingScore = Math.min(100, Math.max(0,
-      40 + (turnCount > 10 ? 15 : 0) + (activeListeningIndicators * 5)
+      15 + (turnCount > 10 ? 20 : 0) + (activeListeningIndicators * 8) + (empathyStatements * 5)
     ));
 
     return {

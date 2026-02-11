@@ -490,6 +490,98 @@ router.patch('/employees/:id/status', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/admin/employees/:id/assign-teacher - Assign AI teacher to employee
+router.patch('/employees/:id/assign-teacher', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+
+    // Get organization ID (supports impersonation)
+    const organizationId = await getOrganizationId(req);
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Only org_admin can assign teachers (impersonating super admin has org_admin role)
+    if (req.user!.role !== 'org_admin') {
+      return res.status(403).json({ error: 'Only organization admins can assign teachers' });
+    }
+
+    const { id } = req.params;
+    const { teacherId } = req.body;
+
+    // Verify employee exists and belongs to same organization
+    const employee = await prisma.trainee.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // If teacherId is null, unassign the teacher
+    if (teacherId === null) {
+      const updatedEmployee = await prisma.trainee.update({
+        where: { id },
+        data: {
+          assignedTeacherId: null,
+          assignedTeacher: null,
+          assignedTeacherAt: null,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          assignedTeacherId: true,
+        },
+      });
+      return res.json({ message: 'Teacher unassigned successfully', employee: updatedEmployee });
+    }
+
+    // Verify teacher exists and belongs to same organization
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id: teacherId, organizationId },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'AI Teacher not found' });
+    }
+
+    // Assign the teacher
+    const updatedEmployee = await prisma.trainee.update({
+      where: { id },
+      data: {
+        assignedTeacherId: teacher.id,
+        assignedTeacher: teacher.name,
+        assignedTeacherAt: new Date(),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        assignedTeacherId: true,
+        assignedTeacher: true,
+        assignedTeacherAt: true,
+      },
+    });
+
+    res.json({
+      message: 'Teacher assigned successfully',
+      employee: updatedEmployee,
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        displayNameAr: teacher.displayNameAr,
+        displayNameEn: teacher.displayNameEn,
+      },
+    });
+  } catch (error) {
+    console.error('Error assigning teacher:', error);
+    res.status(500).json({ error: 'Failed to assign teacher' });
+  }
+});
+
 // DELETE /api/admin/employees/:id - Delete an employee
 router.delete('/employees/:id', async (req: Request, res: Response) => {
   try {

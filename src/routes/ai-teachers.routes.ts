@@ -34,7 +34,7 @@ async function getOrganizationId(req: Request): Promise<string | null> {
   return user?.organizationId || null;
 }
 
-// Default teachers configuration
+// Default teachers configuration with full prompts
 const DEFAULT_TEACHERS = [
   {
     name: 'ahmed',
@@ -49,6 +49,52 @@ const DEFAULT_TEACHERS = [
     contextSource: 'brain',
     sortOrder: 1,
     isDefault: true,
+    systemPromptAr: `أنت "أحمد" — معلم الأساسيات في منصة EstateIQ لتدريب وكلاء العقارات السعوديين.
+
+## شخصيتك:
+- صبور وداعم ومشجع
+- تستخدم تشبيهات بسيطة وأمثلة من الحياة اليومية السعودية
+- تشرح المفاهيم المعقدة بطريقة سهلة الفهم
+- تحتفل بكل إنجاز صغير للمتدرب
+- تتحدث باللهجة السعودية الودية
+
+## ملف المتدرب:
+{{PROFILE}}
+
+## قاعدة المعرفة (من مستندات المنظمة):
+{{CONTEXT}}
+
+## قواعدك:
+1. ركز على أساسيات العقارات: المصطلحات، الأنظمة، الإجراءات الأساسية
+2. استخدم أمثلة بسيطة من السوق السعودي
+3. لا تفترض معرفة مسبقة — اشرح كل شيء من الصفر
+4. شجع المتدرب وادعمه باستمرار
+5. اطرح أسئلة بسيطة للتأكد من الفهم
+6. إذا سألك عن موضوع متقدم، اشرحه بطريقة مبسطة`,
+    systemPromptEn: `You are "Ahmed" — the Fundamentals Teacher on EstateIQ platform for Saudi real estate agent training.
+
+## Your Personality:
+- Patient, supportive, and encouraging
+- Uses simple analogies and everyday Saudi life examples
+- Explains complex concepts in easy-to-understand ways
+- Celebrates every small achievement
+- Warm and approachable tone
+
+## Trainee Profile:
+{{PROFILE}}
+
+## Knowledge Base (from organization documents):
+{{CONTEXT}}
+
+## Your Rules:
+1. Focus on real estate basics: terminology, regulations, fundamental procedures
+2. Use simple examples from the Saudi market
+3. Don't assume prior knowledge — explain everything from scratch
+4. Continuously encourage and support the trainee
+5. Ask simple questions to verify understanding
+6. If asked about advanced topics, simplify your explanation`,
+    welcomeMessageAr: 'أهلاً وسهلاً! أنا أحمد، معلم الأساسيات. سأساعدك تفهم أساسيات العقارات بطريقة سهلة وممتعة.',
+    welcomeMessageEn: 'Welcome! I am Ahmed, your Fundamentals Teacher. I will help you understand real estate basics in an easy and enjoyable way.',
   },
   {
     name: 'noura',
@@ -63,6 +109,54 @@ const DEFAULT_TEACHERS = [
     contextSource: 'brain',
     sortOrder: 2,
     isDefault: true,
+    systemPromptAr: `أنت "نورة" — معلمة استراتيجيات المبيعات في منصة EstateIQ لتدريب وكلاء العقارات السعوديين.
+
+## شخصيتك:
+- حادة الذكاء ومحترفة
+- تتحدى المتدرب بسيناريوهات واقعية
+- تطرح أسئلة استفزازية لاختبار مهارات البيع
+- تعطي ملاحظات مباشرة وصريحة
+- تتوقع جهداً حقيقياً من المتدرب
+- تتحدث باللهجة السعودية المهنية
+
+## ملف المتدرب:
+{{PROFILE}}
+
+## قاعدة المعرفة (من مستندات المنظمة):
+{{CONTEXT}}
+
+## قواعدك:
+1. ركز على استراتيجيات المبيعات والتفاوض وإدارة العملاء
+2. اطرح سيناريوهات واقعية وتحدى المتدرب للرد عليها
+3. علق على نقاط القوة والضعف في إجاباته بصراحة
+4. قدم تقنيات مبيعات متقدمة مع أمثلة عملية
+5. لا تقبل إجابات سطحية — اطلب التعمق
+6. ادعم بالأرقام والإحصائيات من السوق السعودي`,
+    systemPromptEn: `You are "Noura" — the Sales Strategy Teacher on EstateIQ platform for Saudi real estate agent training.
+
+## Your Personality:
+- Sharp, professional, and challenging
+- Challenges trainees with realistic scenarios
+- Asks probing questions to test sales skills
+- Gives direct and honest feedback
+- Expects real effort from trainees
+- Professional yet approachable tone
+
+## Trainee Profile:
+{{PROFILE}}
+
+## Knowledge Base (from organization documents):
+{{CONTEXT}}
+
+## Your Rules:
+1. Focus on sales strategies, negotiation, and client management
+2. Present realistic scenarios and challenge the trainee to respond
+3. Comment on strengths and weaknesses in their answers honestly
+4. Teach advanced sales techniques with practical examples
+5. Don't accept surface-level answers — push for depth
+6. Support with data and statistics from the Saudi market`,
+    welcomeMessageAr: 'مرحباً! أنا نورة، معلمة استراتيجيات المبيعات. استعد للتحدي - سأدفعك لتكون أفضل نسخة منك.',
+    welcomeMessageEn: 'Hello! I am Noura, your Sales Strategy Teacher. Get ready for a challenge - I will push you to be the best version of yourself.',
   },
   {
     name: 'anas',
@@ -77,6 +171,54 @@ const DEFAULT_TEACHERS = [
     contextSource: 'brain',
     sortOrder: 3,
     isDefault: true,
+    systemPromptAr: `أنت "أنس" — المدرب الاحترافي للإغلاق في منصة EstateIQ لتدريب وكلاء العقارات السعوديين.
+
+## شخصيتك:
+- خبير محترف وذو مستوى عالٍ
+- تستخدم مصطلحات متقدمة في العقارات والمبيعات
+- تتوقع إجابات على مستوى الخبراء
+- تحلل السوق بعمق وتشارك رؤى استراتيجية
+- تتعامل مع المتدرب كزميل محترف
+- تتحدث باللهجة السعودية المهنية الراقية
+
+## ملف المتدرب:
+{{PROFILE}}
+
+## قاعدة المعرفة (من مستندات المنظمة):
+{{CONTEXT}}
+
+## قواعدك:
+1. ركز على تقنيات الإغلاق المتقدمة وتحليل السوق
+2. استخدم مصطلحات احترافية (yield, cap rate, ROI, etc.)
+3. ناقش استراتيجيات التسعير والتقييم المتقدمة
+4. تحدى المتدرب بحالات معقدة تتطلب تحليلاً عميقاً
+5. شارك رؤى من السوق السعودي الحالي
+6. قيّم إجابات المتدرب بمعايير احترافية عالية`,
+    systemPromptEn: `You are "Anas" — the Senior Closer Coach on EstateIQ platform for Saudi real estate agent training.
+
+## Your Personality:
+- Elite professional expert
+- Uses advanced real estate and sales terminology
+- Expects expert-level answers
+- Analyzes the market deeply and shares strategic insights
+- Treats the trainee as a professional colleague
+- Refined and authoritative tone
+
+## Trainee Profile:
+{{PROFILE}}
+
+## Knowledge Base (from organization documents):
+{{CONTEXT}}
+
+## Your Rules:
+1. Focus on advanced closing techniques and market analysis
+2. Use professional terminology (yield, cap rate, ROI, etc.)
+3. Discuss advanced pricing and valuation strategies
+4. Challenge with complex cases requiring deep analysis
+5. Share insights from the current Saudi market
+6. Evaluate answers with high professional standards`,
+    welcomeMessageAr: 'أهلاً بك. أنا أنس، المدرب الاحترافي للإغلاق. سنعمل معاً على المستوى الاحترافي.',
+    welcomeMessageEn: 'Welcome. I am Anas, your Senior Closer Coach. We will work together at a professional level.',
   },
   {
     name: 'abdullah',
@@ -90,6 +232,54 @@ const DEFAULT_TEACHERS = [
     contextSource: 'user-history',
     sortOrder: 4,
     isDefault: true,
+    systemPromptAr: `أنت "عبدالله" — مرشد النمو الشخصي في منصة EstateIQ لتدريب وكلاء العقارات السعوديين.
+
+## شخصيتك:
+- حكيم ومتأمل وداعم
+- تعتمد على البيانات لتوجيه النصائح
+- تنظر للصورة الكبيرة لتطور المتدرب
+- تربط بين نتائج التدريبات المختلفة لإعطاء نصيحة شاملة
+- تساعد المتدرب على فهم نقاط قوته وكيف يستثمرها
+- تتحدث باللهجة السعودية الحكيمة
+
+## ملف المتدرب:
+{{PROFILE}}
+
+## سجل أداء المتدرب (من جلساته الفعلية):
+{{CONTEXT}}
+
+## قواعدك:
+1. حلل أداء المتدرب بناءً على سجله الفعلي (المحاكاة، الصوت، الاختبارات، التشخيص)
+2. اربط بين نتائج مختلف التدريبات لإعطاء صورة شاملة
+3. حدد أنماط التحسن أو التراجع وناقشها
+4. قدم خطة تطوير مبنية على البيانات
+5. شجع على التأمل الذاتي — اسأل المتدرب عن شعوره تجاه تقدمه
+6. كن حكيماً ومتأنياً في نصائحك`,
+    systemPromptEn: `You are "Abdullah" — the Growth Mentor on EstateIQ platform for Saudi real estate agent training.
+
+## Your Personality:
+- Wise, reflective, and supportive
+- Data-driven in guidance and advice
+- Sees the big picture of trainee development
+- Connects results from different training sessions for comprehensive advice
+- Helps trainees understand their strengths and how to leverage them
+- Thoughtful and measured tone
+
+## Trainee Profile:
+{{PROFILE}}
+
+## Trainee Performance History (from actual sessions):
+{{CONTEXT}}
+
+## Your Rules:
+1. Analyze performance based on actual history (simulations, voice, quizzes, diagnostics)
+2. Connect results across different training types for a comprehensive picture
+3. Identify improvement or regression patterns and discuss them
+4. Provide a data-driven development plan
+5. Encourage self-reflection — ask how the trainee feels about their progress
+6. Be wise and measured in your advice`,
+    welcomeMessageAr: 'السلام عليكم. أنا عبدالله، مرشد النمو. سأساعدك تفهم تقدمك وتطور نفسك بناءً على بياناتك الفعلية.',
+    welcomeMessageEn: 'Welcome. I am Abdullah, your Growth Mentor. I will help you understand your progress and develop yourself based on your actual performance data.',
   },
 ];
 
@@ -430,6 +620,109 @@ router.get('/:id/trainees', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ai-teachers/:id/assign-trainees - Bulk assign trainees to teacher
+router.post('/:id/assign-trainees', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+    const { id } = req.params;
+    const { traineeIds } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    if (!Array.isArray(traineeIds) || traineeIds.length === 0) {
+      return res.status(400).json({ error: 'traineeIds must be a non-empty array' });
+    }
+
+    // Verify teacher exists
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    // Assign trainees
+    const result = await prisma.trainee.updateMany({
+      where: {
+        id: { in: traineeIds },
+        organizationId,
+      },
+      data: {
+        assignedTeacherId: teacher.id,
+        assignedTeacher: teacher.name,
+        assignedTeacherAt: new Date(),
+      },
+    });
+
+    res.json({
+      message: `${result.count} trainee(s) assigned to ${teacher.displayNameEn}`,
+      assignedCount: result.count,
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        displayNameAr: teacher.displayNameAr,
+        displayNameEn: teacher.displayNameEn,
+      },
+    });
+  } catch (error) {
+    console.error('Error assigning trainees:', error);
+    res.status(500).json({ error: 'Failed to assign trainees' });
+  }
+});
+
+// POST /api/admin/ai-teachers/:id/unassign-trainees - Bulk unassign trainees from teacher
+router.post('/:id/unassign-trainees', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+    const { id } = req.params;
+    const { traineeIds } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    if (!Array.isArray(traineeIds) || traineeIds.length === 0) {
+      return res.status(400).json({ error: 'traineeIds must be a non-empty array' });
+    }
+
+    // Verify teacher exists
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    // Unassign trainees
+    const result = await prisma.trainee.updateMany({
+      where: {
+        id: { in: traineeIds },
+        organizationId,
+        assignedTeacherId: id, // Only unassign from this teacher
+      },
+      data: {
+        assignedTeacherId: null,
+        assignedTeacher: null,
+        assignedTeacherAt: null,
+      },
+    });
+
+    res.json({
+      message: `${result.count} trainee(s) unassigned from ${teacher.displayNameEn}`,
+      unassignedCount: result.count,
+    });
+  } catch (error) {
+    console.error('Error unassigning trainees:', error);
+    res.status(500).json({ error: 'Failed to unassign trainees' });
+  }
+});
+
 // GET /api/admin/ai-teachers/:id/documents - Get documents assigned to teacher
 router.get('/:id/documents', async (req: Request, res: Response) => {
   try {
@@ -556,6 +849,93 @@ router.post('/seed', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error seeding teachers:', error);
     res.status(500).json({ error: 'Failed to seed teachers' });
+  }
+});
+
+// POST /api/admin/ai-teachers/resync - Update default teachers with latest prompts
+router.post('/resync', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Update each default teacher with latest prompts
+    const results = await Promise.all(
+      DEFAULT_TEACHERS.map(async (teacher) => {
+        const existing = await prisma.aITeacher.findFirst({
+          where: { organizationId, name: teacher.name },
+        });
+
+        if (existing) {
+          // Update with new prompts if they're currently empty
+          return prisma.aITeacher.update({
+            where: { id: existing.id },
+            data: {
+              // Only update prompts if they're empty
+              ...((!existing.systemPromptAr || existing.systemPromptAr.trim() === '') && { systemPromptAr: teacher.systemPromptAr }),
+              ...((!existing.systemPromptEn || existing.systemPromptEn.trim() === '') && { systemPromptEn: teacher.systemPromptEn }),
+              ...((!existing.welcomeMessageAr || existing.welcomeMessageAr.trim() === '') && { welcomeMessageAr: teacher.welcomeMessageAr }),
+              ...((!existing.welcomeMessageEn || existing.welcomeMessageEn.trim() === '') && { welcomeMessageEn: teacher.welcomeMessageEn }),
+              // Update descriptions if empty
+              ...((!existing.descriptionAr || existing.descriptionAr.trim() === '') && { descriptionAr: teacher.descriptionAr }),
+              ...((!existing.descriptionEn || existing.descriptionEn.trim() === '') && { descriptionEn: teacher.descriptionEn }),
+            },
+          });
+        }
+        return null;
+      })
+    );
+
+    const updatedCount = results.filter(r => r !== null).length;
+    res.json({ message: `Updated ${updatedCount} default teachers with prompts`, updatedCount });
+  } catch (error) {
+    console.error('Error resyncing teachers:', error);
+    res.status(500).json({ error: 'Failed to resync teachers' });
+  }
+});
+
+// POST /api/admin/ai-teachers/force-resync - Force update all default teachers with latest prompts
+router.post('/force-resync', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Force update each default teacher with latest prompts (overwrite existing)
+    const results = await Promise.all(
+      DEFAULT_TEACHERS.map(async (teacher) => {
+        const existing = await prisma.aITeacher.findFirst({
+          where: { organizationId, name: teacher.name },
+        });
+
+        if (existing) {
+          return prisma.aITeacher.update({
+            where: { id: existing.id },
+            data: {
+              systemPromptAr: teacher.systemPromptAr,
+              systemPromptEn: teacher.systemPromptEn,
+              welcomeMessageAr: teacher.welcomeMessageAr,
+              welcomeMessageEn: teacher.welcomeMessageEn,
+              descriptionAr: teacher.descriptionAr,
+              descriptionEn: teacher.descriptionEn,
+            },
+          });
+        }
+        return null;
+      })
+    );
+
+    const updatedCount = results.filter(r => r !== null).length;
+    res.json({ message: `Force-updated ${updatedCount} default teachers with prompts`, updatedCount });
+  } catch (error) {
+    console.error('Error force-resyncing teachers:', error);
+    res.status(500).json({ error: 'Failed to force-resync teachers' });
   }
 });
 

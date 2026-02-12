@@ -609,6 +609,59 @@ router.post('/force-resync', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/ai-teachers/avatar-stats - Get avatar statistics (for debugging)
+router.get('/avatar-stats', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    const teachers = await prisma.aITeacher.findMany({
+      where: { organizationId },
+      select: {
+        name: true,
+        displayNameEn: true,
+        avatarUrl: true,
+      },
+    });
+
+    const stats = teachers.map((t) => {
+      const avatarUrl = t.avatarUrl || '';
+      const isBase64 = avatarUrl.startsWith('data:');
+      const isWebP = avatarUrl.includes('image/webp');
+      const sizeKB = Math.round(avatarUrl.length / 1024);
+
+      return {
+        name: t.name,
+        displayName: t.displayNameEn,
+        isBase64,
+        isWebP,
+        sizeKB,
+        type: isBase64 ? avatarUrl.substring(5, avatarUrl.indexOf(';')) : 'external URL',
+      };
+    });
+
+    const totalSizeKB = stats.reduce((sum, s) => sum + s.sizeKB, 0);
+
+    res.json({
+      teachers: stats,
+      summary: {
+        totalTeachers: stats.length,
+        totalSizeKB,
+        totalSizeMB: (totalSizeKB / 1024).toFixed(2),
+        webpCount: stats.filter((s) => s.isWebP).length,
+        base64Count: stats.filter((s) => s.isBase64).length,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching avatar stats:', error);
+    res.status(500).json({ error: 'Failed to fetch avatar stats' });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DYNAMIC ROUTES - These use :id parameter
 // ═══════════════════════════════════════════════════════════════════════════

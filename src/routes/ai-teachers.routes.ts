@@ -1037,51 +1037,66 @@ router.get('/:id/documents', async (req: Request, res: Response) => {
 });
 
 // POST /api/admin/ai-teachers/:id/avatar - Upload teacher avatar
-router.post('/:id/avatar', upload.single('avatar'), async (req: Request, res: Response) => {
-  try {
-    const prisma = container.resolve<PrismaClient>('PrismaClient');
-    const organizationId = await getOrganizationId(req);
-    const { id } = req.params;
+router.post('/:id/avatar', (req: Request, res: Response, next) => {
+  // Handle multer upload with proper error handling
+  upload.single('avatar')(req, res, async (uploadError) => {
+    try {
+      // Check for multer errors first
+      if (uploadError) {
+        console.error('Multer upload error:', uploadError);
+        if (uploadError instanceof multer.MulterError) {
+          if (uploadError.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+          }
+          return res.status(400).json({ error: `Upload error: ${uploadError.message}` });
+        }
+        return res.status(400).json({ error: uploadError.message || 'Failed to upload file' });
+      }
 
-    if (!organizationId) {
-      return res.status(400).json({ error: 'Organization context required' });
-    }
+      const prisma = container.resolve<PrismaClient>('PrismaClient');
+      const organizationId = await getOrganizationId(req);
+      const { id } = req.params;
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No avatar file uploaded' });
-    }
+      if (!organizationId) {
+        return res.status(400).json({ error: 'Organization context required' });
+      }
 
-    // Verify teacher exists
-    const teacher = await prisma.aITeacher.findFirst({
-      where: { id, organizationId },
-    });
+      if (!req.file) {
+        return res.status(400).json({ error: 'No avatar file uploaded' });
+      }
 
-    if (!teacher) {
-      return res.status(404).json({ error: 'Teacher not found' });
-    }
+      // Verify teacher exists
+      const teacher = await prisma.aITeacher.findFirst({
+        where: { id, organizationId },
+      });
 
-    // Convert to base64 data URL for now (can be replaced with GCS later)
-    const base64 = req.file.buffer.toString('base64');
-    const avatarUrl = `data:${req.file.mimetype};base64,${base64}`;
+      if (!teacher) {
+        return res.status(404).json({ error: 'Teacher not found' });
+      }
 
-    const updatedTeacher = await prisma.aITeacher.update({
-      where: { id },
-      data: { avatarUrl },
-      include: {
-        _count: {
-          select: {
-            assignedTrainees: true,
-            documents: true,
+      // Convert to base64 data URL for now (can be replaced with GCS later)
+      const base64 = req.file.buffer.toString('base64');
+      const avatarUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+      const updatedTeacher = await prisma.aITeacher.update({
+        where: { id },
+        data: { avatarUrl },
+        include: {
+          _count: {
+            select: {
+              assignedTrainees: true,
+              documents: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    res.json({ teacher: updatedTeacher });
-  } catch (error) {
-    console.error('Error uploading avatar:', error);
-    res.status(500).json({ error: 'Failed to upload avatar' });
-  }
+      res.json({ teacher: updatedTeacher });
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      res.status(500).json({ error: 'Failed to upload avatar' });
+    }
+  });
 });
 
 export default router;

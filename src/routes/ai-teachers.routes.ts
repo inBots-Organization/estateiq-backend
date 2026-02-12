@@ -1047,12 +1047,15 @@ router.post('/:id/unassign-trainees', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
-    // Unassign trainees
+    // Unassign trainees (handle both new assignedTeacherId and legacy assignedTeacher field)
     const result = await prisma.trainee.updateMany({
       where: {
         id: { in: traineeIds },
         organizationId,
-        assignedTeacherId: id, // Only unassign from this teacher
+        OR: [
+          { assignedTeacherId: id },
+          { assignedTeacher: teacher.name }, // Legacy field
+        ],
       },
       data: {
         assignedTeacherId: null,

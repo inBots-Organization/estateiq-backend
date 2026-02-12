@@ -1,10 +1,14 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies for sharp
-RUN apk add --no-cache python3 make g++ vips-dev
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -24,17 +28,20 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma and dependencies for sharp (image processing)
-RUN apk add --no-cache openssl vips-dev
+# Install runtime dependencies for Prisma and sharp
+RUN apt-get update && apt-get install -y \
+    openssl \
+    libvips42 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only (rebuild sharp for Alpine)
+# Install production dependencies only
 RUN npm ci --only=production
 
 # Copy prisma schema and generate client

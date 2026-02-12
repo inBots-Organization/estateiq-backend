@@ -910,18 +910,17 @@ router.get('/:id/available-trainees', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
-    // Get all trainees NOT assigned to this teacher
-    // Exclude those who have assignedTeacherId = this teacher OR assignedTeacher (legacy) = teacher name
+    // Get ALL trainees in the organization (for transfer capability)
+    // We show all trainees except those already assigned to THIS specific teacher
     const trainees = await prisma.trainee.findMany({
       where: {
         organizationId,
         role: 'trainee',
-        NOT: {
-          OR: [
-            { assignedTeacherId: id },
-            { assignedTeacher: teacher.name },
-          ],
-        },
+        // Exclude only trainees assigned to THIS teacher (by ID or legacy name)
+        AND: [
+          { OR: [{ assignedTeacherId: { not: id } }, { assignedTeacherId: null }] },
+          { OR: [{ assignedTeacher: { not: teacher.name } }, { assignedTeacher: null }] },
+        ],
       },
       select: {
         id: true,
@@ -932,32 +931,33 @@ router.get('/:id/available-trainees', async (req: Request, res: Response) => {
         assignedTeacherId: true,
         assignedTeacher: true,
       },
-      orderBy: { lastName: 'asc' },
+      orderBy: { firstName: 'asc' },
     });
 
-    // Also get teacher names for those who have assignments
-    const teacherIds = [...new Set(trainees.filter(t => t.assignedTeacherId).map(t => t.assignedTeacherId))];
-    const teachers = teacherIds.length > 0
-      ? await prisma.aITeacher.findMany({
-          where: { id: { in: teacherIds as string[] } },
-          select: { id: true, displayNameAr: true, displayNameEn: true, name: true },
-        })
-      : [];
+    // Get all teachers for displaying current assignments
+    const allTeachers = await prisma.aITeacher.findMany({
+      where: { organizationId },
+      select: { id: true, displayNameAr: true, displayNameEn: true, name: true },
+    });
 
-    const teacherMap = new Map(teachers.map(t => [t.id, t]));
+    const teacherMapById = new Map(allTeachers.map(t => [t.id, t]));
+    const teacherMapByName = new Map(allTeachers.map(t => [t.name, t]));
 
     // Enrich trainees with current teacher info
     const enrichedTrainees = trainees.map(trainee => {
+      // Check by ID first, then by legacy name
       const currentTeacher = trainee.assignedTeacherId
-        ? teacherMap.get(trainee.assignedTeacherId)
-        : null;
+        ? teacherMapById.get(trainee.assignedTeacherId)
+        : trainee.assignedTeacher
+          ? teacherMapByName.get(trainee.assignedTeacher)
+          : null;
+
       return {
         ...trainee,
         currentTeacherName: currentTeacher
           ? { ar: currentTeacher.displayNameAr, en: currentTeacher.displayNameEn }
-          : trainee.assignedTeacher
-            ? { ar: trainee.assignedTeacher, en: trainee.assignedTeacher }
-            : null,
+          : null,
+        hasAssignment: !!(trainee.assignedTeacherId || trainee.assignedTeacher),
       };
     });
 

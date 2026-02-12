@@ -177,6 +177,7 @@ export class BrainService implements IBrainService {
       errorMessage: doc.errorMessage,
       contentLevel: (doc.contentLevel || 'general') as BrainDocumentSummary['contentLevel'],
       targetPersona: doc.targetPersona || null,
+      teacherId: doc.teacherId || null,
       tags: doc.tags || [],
       createdAt: doc.createdAt,
     }));

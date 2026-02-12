@@ -17,6 +17,7 @@ export interface BrainDocumentSummary {
   errorMessage?: string | null;
   contentLevel: ContentLevel;
   targetPersona?: string | null;
+  teacherId?: string | null;
   tags: string[];
   createdAt: Date;
 }

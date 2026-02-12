@@ -4,9 +4,8 @@ import { PrismaClient } from '@prisma/client';
 
 // Providers
 import { ILLMProvider } from './providers/llm/llm-provider.interface';
-import { AnthropicLLMProvider } from './providers/llm/anthropic.provider';
+import { FallbackLLMProvider } from './providers/llm/fallback.provider';
 import { MockLLMProvider } from './providers/llm/mock.provider';
-import { GroqLLMProvider } from './providers/llm/groq.provider';
 
 // Repositories
 import { ITraineeRepository } from './repositories/interfaces/trainee.repository.interface';
@@ -60,23 +59,16 @@ const prisma = new PrismaClient({
 // Register Prisma Client
 container.registerInstance('PrismaClient', prisma);
 
-// Register LLM Provider based on environment
-const llmProvider = process.env.LLM_PROVIDER || 'mock';
-const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
-const hasGroqKey = !!process.env.GROQ_API_KEY;
+// Register LLM Provider with automatic fallback
+// FallbackLLMProvider tries: Gemini (fast) → Claude (quality) → Groq (free backup)
+const hasAnyLLMKey = !!process.env.GEMINI_API_KEY || !!process.env.ANTHROPIC_API_KEY || !!process.env.GROQ_API_KEY;
 
-if (llmProvider === 'anthropic' && hasAnthropicKey) {
-  container.registerSingleton<ILLMProvider>('LLMProvider', AnthropicLLMProvider);
-} else if (llmProvider === 'groq' && hasGroqKey) {
-  container.registerSingleton<ILLMProvider>('LLMProvider', GroqLLMProvider);
-} else if (hasAnthropicKey) {
-  // Default to Anthropic if key is available even if LLM_PROVIDER is not set
-  container.registerSingleton<ILLMProvider>('LLMProvider', AnthropicLLMProvider);
-} else if (hasGroqKey) {
-  // Fallback to Groq if available
-  container.registerSingleton<ILLMProvider>('LLMProvider', GroqLLMProvider);
+if (hasAnyLLMKey) {
+  container.registerSingleton<ILLMProvider>('LLMProvider', FallbackLLMProvider);
+  console.log('[Container] Using FallbackLLMProvider (Gemini → Claude → Groq)');
 } else {
   container.registerSingleton<ILLMProvider>('LLMProvider', MockLLMProvider);
+  console.log('[Container] Using MockLLMProvider (no API keys configured)');
 }
 
 // Register Repositories

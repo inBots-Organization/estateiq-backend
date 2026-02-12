@@ -1492,19 +1492,24 @@ Respond in JSON only:
       throw new Error('ElevenLabs API key not configured');
     }
 
-    // Get voice ID - check static config first, then database for custom teachers
+    // Get voice ID - PRIORITY: database first (allows admin to override), then static config, then language default
     let voiceId: string;
     if (teacherName) {
-      if (isStaticTeacher(teacherName)) {
-        // Use static config for built-in teachers
+      // First, check database for custom voiceId (allows admin to override any teacher's voice)
+      const teacherFromDb = await this.prisma.aITeacher.findFirst({
+        where: { name: teacherName.toLowerCase() },
+        select: { voiceId: true },
+      });
+
+      if (teacherFromDb?.voiceId) {
+        // Database voiceId takes priority (admin can customize)
+        voiceId = teacherFromDb.voiceId;
+      } else if (isStaticTeacher(teacherName)) {
+        // Fallback to static config for built-in teachers
         voiceId = getTeacherVoiceId(teacherName);
       } else {
-        // For custom teachers, fetch from database
-        const customTeacher = await this.prisma.aITeacher.findFirst({
-          where: { name: teacherName.toLowerCase() },
-          select: { voiceId: true },
-        });
-        voiceId = customTeacher?.voiceId || VOICE_IDS[language];
+        // Ultimate fallback to language default
+        voiceId = VOICE_IDS[language];
       }
     } else {
       voiceId = VOICE_IDS[language];

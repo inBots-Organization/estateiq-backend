@@ -65,6 +65,18 @@ export class AuthService implements IAuthService {
       lastActiveAt: new Date(),
     });
 
+    // Get trainee's assigned teacher if any (for trainees)
+    const traineeWithTeacher = userRole === 'trainee'
+      ? await this.prisma.trainee.findUnique({
+          where: { id: trainee.id },
+          select: {
+            assignedTeacher: true,
+            assignedTeacherId: true,
+            currentSkillLevel: true,
+          },
+        })
+      : null;
+
     return {
       accessToken,
       user: {
@@ -74,6 +86,10 @@ export class AuthService implements IAuthService {
         lastName: trainee.lastName,
         role: userRole,
         organizationId: trainee.organizationId,
+        // Include assigned teacher info for trainees
+        assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
+        assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
+        currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
       },
     };
   }
@@ -136,6 +152,10 @@ export class AuthService implements IAuthService {
         lastName: trainee.lastName,
         role: userRole,
         organizationId: trainee.organizationId,
+        // New users don't have assigned teacher yet
+        assignedTeacher: null,
+        assignedTeacherId: null,
+        currentSkillLevel: null,
       },
     };
   }
@@ -181,6 +201,18 @@ export class AuthService implements IAuthService {
       organizationId: trainee.organizationId,
     });
 
+    // Get trainee's assigned teacher if any (for trainees)
+    const traineeWithTeacher = userRole === 'trainee'
+      ? await this.prisma.trainee.findUnique({
+          where: { id: trainee.id },
+          select: {
+            assignedTeacher: true,
+            assignedTeacherId: true,
+            currentSkillLevel: true,
+          },
+        })
+      : null;
+
     return {
       accessToken,
       user: {
@@ -190,6 +222,9 @@ export class AuthService implements IAuthService {
         lastName: trainee.lastName,
         role: userRole,
         organizationId: trainee.organizationId,
+        assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
+        assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
+        currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
       },
     };
   }

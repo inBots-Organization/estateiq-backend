@@ -27,6 +27,10 @@ export interface AuthResult {
     lastName: string;
     role: string;
     organizationId: string;
+    // Teacher assignment info (for trainees)
+    assignedTeacher?: string | null;
+    assignedTeacherId?: string | null;
+    currentSkillLevel?: string | null;
   };
 }
 

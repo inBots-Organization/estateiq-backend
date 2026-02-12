@@ -890,6 +890,84 @@ router.get('/:id/trainees', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/ai-teachers/:id/available-trainees - Get trainees not assigned to this teacher
+router.get('/:id/available-trainees', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+    const { id } = req.params;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Verify teacher exists
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    // Get all trainees NOT assigned to this teacher
+    // Exclude those who have assignedTeacherId = this teacher OR assignedTeacher (legacy) = teacher name
+    const trainees = await prisma.trainee.findMany({
+      where: {
+        organizationId,
+        role: 'trainee',
+        NOT: {
+          OR: [
+            { assignedTeacherId: id },
+            { assignedTeacher: teacher.name },
+          ],
+        },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        currentSkillLevel: true,
+        assignedTeacherId: true,
+        assignedTeacher: true,
+      },
+      orderBy: { lastName: 'asc' },
+    });
+
+    // Also get teacher names for those who have assignments
+    const teacherIds = [...new Set(trainees.filter(t => t.assignedTeacherId).map(t => t.assignedTeacherId))];
+    const teachers = teacherIds.length > 0
+      ? await prisma.aITeacher.findMany({
+          where: { id: { in: teacherIds as string[] } },
+          select: { id: true, displayNameAr: true, displayNameEn: true, name: true },
+        })
+      : [];
+
+    const teacherMap = new Map(teachers.map(t => [t.id, t]));
+
+    // Enrich trainees with current teacher info
+    const enrichedTrainees = trainees.map(trainee => {
+      const currentTeacher = trainee.assignedTeacherId
+        ? teacherMap.get(trainee.assignedTeacherId)
+        : null;
+      return {
+        ...trainee,
+        currentTeacherName: currentTeacher
+          ? { ar: currentTeacher.displayNameAr, en: currentTeacher.displayNameEn }
+          : trainee.assignedTeacher
+            ? { ar: trainee.assignedTeacher, en: trainee.assignedTeacher }
+            : null,
+      };
+    });
+
+    res.json({ trainees: enrichedTrainees });
+  } catch (error) {
+    console.error('Error fetching available trainees:', error);
+    res.status(500).json({ error: 'Failed to fetch available trainees' });
+  }
+});
+
 // POST /api/admin/ai-teachers/:id/assign-trainees - Bulk assign trainees to teacher
 router.post('/:id/assign-trainees', async (req: Request, res: Response) => {
   try {

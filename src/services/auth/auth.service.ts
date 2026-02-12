@@ -73,6 +73,13 @@ export class AuthService implements IAuthService {
             assignedTeacher: true,
             assignedTeacherId: true,
             currentSkillLevel: true,
+            assignedTeacherRecord: {
+              select: {
+                avatarUrl: true,
+                displayNameAr: true,
+                displayNameEn: true,
+              },
+            },
           },
         })
       : null;
@@ -90,6 +97,9 @@ export class AuthService implements IAuthService {
         assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
         assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
         currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
+        assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
+        assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
+        assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
       },
     };
   }
@@ -209,6 +219,13 @@ export class AuthService implements IAuthService {
             assignedTeacher: true,
             assignedTeacherId: true,
             currentSkillLevel: true,
+            assignedTeacherRecord: {
+              select: {
+                avatarUrl: true,
+                displayNameAr: true,
+                displayNameEn: true,
+              },
+            },
           },
         })
       : null;
@@ -225,6 +242,9 @@ export class AuthService implements IAuthService {
         assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
         assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
         currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
+        assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
+        assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
+        assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
       },
     };
   }

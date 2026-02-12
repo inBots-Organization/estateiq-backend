@@ -1,14 +1,7 @@
 # Build stage
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -28,15 +21,12 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage
-FROM node:20-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install runtime dependencies for Prisma and sharp
-RUN apt-get update && apt-get install -y \
-    openssl \
-    libvips42 \
-    && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
 
 # Copy package files
 COPY package*.json ./

@@ -4,6 +4,7 @@ import { IReportRepository } from '../../repositories/interfaces/report.reposito
 import { ISimulationRepository } from '../../repositories/interfaces/simulation.repository.interface';
 import { IQuizRepository } from '../../repositories/interfaces/quiz.repository.interface';
 import { ICourseRepository } from '../../repositories/interfaces/course.repository.interface';
+import { ITraineeRepository } from '../../repositories/interfaces/trainee.repository.interface';
 import {
   IDiagnosticService,
   DiagnosticStatusOutput,
@@ -27,6 +28,7 @@ export class DiagnosticService implements IDiagnosticService {
     @inject('SimulationRepository') private simulationRepo: ISimulationRepository,
     @inject('QuizRepository') private quizRepo: IQuizRepository,
     @inject('CourseRepository') private courseRepo: ICourseRepository,
+    @inject('TraineeRepository') private traineeRepo: ITraineeRepository,
     @inject(EvaluatorService) private evaluatorService: EvaluatorService
   ) {}
 
@@ -34,11 +36,21 @@ export class DiagnosticService implements IDiagnosticService {
     const latestSession = await this.diagnosticRepo.getLatestSession(traineeId);
     const latestReport = await this.diagnosticRepo.getLatestReport(traineeId);
 
+    // CRITICAL: Check if trainee already has an assigned teacher (from admin or previous evaluation)
+    // If they have a teacher, they don't need diagnostic regardless of session history
+    const trainee = await this.traineeRepo.findById(traineeId);
+    const hasAssignedTeacher = trainee?.assignedTeacher !== null && trainee?.assignedTeacher !== undefined;
+
     const lastDiagnosticAt = latestSession?.completedAt || null;
     let hoursSinceLast: number | null = null;
     let needsDiagnostic = true;
 
-    if (lastDiagnosticAt) {
+    // If trainee has an assigned teacher (from admin or previous evaluation), NO diagnostic needed
+    if (hasAssignedTeacher) {
+      console.log(`[DiagnosticService] Trainee ${traineeId} has assignedTeacher: ${trainee?.assignedTeacher} - no diagnostic needed`);
+      needsDiagnostic = false;
+    } else if (lastDiagnosticAt) {
+      // Otherwise, check time threshold
       hoursSinceLast = (Date.now() - lastDiagnosticAt.getTime()) / (1000 * 60 * 60);
       needsDiagnostic = hoursSinceLast > DIAGNOSTIC_THRESHOLD_HOURS;
     }

@@ -13,7 +13,7 @@ router.use(authMiddleware(['admin', 'org_admin']));
 // Configure multer for avatar uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for avatars
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -1046,7 +1046,7 @@ router.post('/:id/avatar', (req: Request, res: Response, next) => {
         console.error('Multer upload error:', uploadError);
         if (uploadError instanceof multer.MulterError) {
           if (uploadError.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+            return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
           }
           return res.status(400).json({ error: `Upload error: ${uploadError.message}` });
         }

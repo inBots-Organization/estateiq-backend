@@ -1487,14 +1487,18 @@ Respond in JSON only:
    * @param language - Language code ('ar' or 'en')
    * @param teacherName - Optional teacher name for persona-specific voice
    */
-  async textToSpeech(text: string, language: 'ar' | 'en', teacherName?: string): Promise<string> {
+  async textToSpeech(text: string, language: 'ar' | 'en', teacherName?: string, directVoiceId?: string): Promise<string> {
     if (!this.elevenLabsApiKey) {
       throw new Error('ElevenLabs API key not configured');
     }
 
-    // Get voice ID - PRIORITY: database first (allows admin to override), then static config, then language default
+    // Get voice ID - PRIORITY: direct voiceId (for preview), then database, then static config, then language default
     let voiceId: string;
-    if (teacherName) {
+
+    // If directVoiceId is provided (e.g., for admin preview before saving), use it directly
+    if (directVoiceId) {
+      voiceId = directVoiceId;
+    } else if (teacherName) {
       // First, check database for custom voiceId (allows admin to override any teacher's voice)
       const teacherFromDb = await this.prisma.aITeacher.findFirst({
         where: { name: teacherName.toLowerCase() },

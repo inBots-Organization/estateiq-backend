@@ -470,7 +470,7 @@ export class AITeacherController {
 
   private async textToSpeech(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { text, language, teacherName } = req.body;
+      const { text, language, teacherName, voiceId } = req.body;
 
       if (!text || typeof text !== 'string') {
         res.status(400).json({ error: 'Text is required' });
@@ -485,7 +485,8 @@ export class AITeacherController {
       }
 
       const lang = language === 'en' ? 'en' : 'ar';
-      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang, teacherName);
+      // If voiceId is provided directly (e.g., for preview), use it; otherwise use teacherName lookup
+      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang, teacherName, voiceId);
 
       res.status(200).json({ audio: audioBase64 });
     } catch (error) {

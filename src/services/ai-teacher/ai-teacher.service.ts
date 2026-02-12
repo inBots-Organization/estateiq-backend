@@ -623,8 +623,11 @@ ${sessionNotesSection}
 
     // Try to get AI-generated greeting with a short timeout
     try {
-      const greetingGenerator = teacherName && isValidTeacherName(teacherName)
-        ? this.generatePersonaGreeting(profile, isArabic, teacherName as TeacherPersonaName)
+      // Support both static teachers and custom teachers from database
+      const greetingGenerator = teacherName
+        ? (isValidTeacherName(teacherName)
+            ? this.generatePersonaGreeting(profile, isArabic, teacherName as TeacherPersonaName)
+            : this.generateCustomTeacherGreeting(profile, isArabic, teacherName))
         : this.generateAIGreeting(profile, isArabic);
 
       const aiGreeting = await Promise.race([
@@ -770,6 +773,155 @@ Average score: ${profile.averageScore}%`;
     });
   }
 
+  /**
+   * Build system prompt for custom teachers from database
+   */
+  private async buildCustomTeacherSystemPrompt(
+    teacherName: string,
+    profileMarkdown: string,
+    lessonContextSection: string,
+    attachmentContext: string,
+    isArabic: boolean
+  ): Promise<string> {
+    // Fetch custom teacher from database
+    const customTeacher = await this.prisma.aITeacher.findFirst({
+      where: { name: teacherName.toLowerCase() },
+      select: {
+        displayNameAr: true,
+        displayNameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        personality: true,
+        systemPromptAr: true,
+        systemPromptEn: true,
+        level: true,
+        brainQueryPrefix: true,
+        contextSource: true,
+      },
+    });
+
+    const displayName = isArabic
+      ? (customTeacher?.displayNameAr || teacherName)
+      : (customTeacher?.displayNameEn || teacherName);
+
+    const description = isArabic
+      ? (customTeacher?.descriptionAr || 'معلم ذكاء اصطناعي متخصص')
+      : (customTeacher?.descriptionEn || 'AI teacher specialist');
+
+    // Use custom system prompt if available, otherwise generate default
+    let systemPrompt: string;
+
+    if (customTeacher?.systemPromptAr && isArabic) {
+      // Use custom Arabic system prompt with placeholders
+      systemPrompt = customTeacher.systemPromptAr
+        .replace('{{PROFILE}}', profileMarkdown)
+        .replace('{{NAME}}', displayName);
+    } else if (customTeacher?.systemPromptEn && !isArabic) {
+      // Use custom English system prompt with placeholders
+      systemPrompt = customTeacher.systemPromptEn
+        .replace('{{PROFILE}}', profileMarkdown)
+        .replace('{{NAME}}', displayName);
+    } else {
+      // Generate default system prompt
+      systemPrompt = isArabic
+        ? `أنت ${displayName} - ${description}.
+
+## ملف المتدرب (استخدمه لتخصيص ردودك):
+${profileMarkdown}
+
+## شخصيتك:
+- المستوى: ${customTeacher?.level || 'general'}
+- الشخصية: ${customTeacher?.personality || 'friendly'}
+
+## قواعدك:
+1. تحدث باللهجة السعودية الودية والمهنية
+2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب
+3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم الحقيقي
+4. ركز على التطبيق العملي في سوق العقارات السعودي
+5. شجع المتدرب وادعمه مع تقديم نقد بناء
+6. إذا طُلب منك موضوع خارج العقارات، وجه المحادثة بلطف للتركيز على التدريب`
+        : `You are ${displayName} - ${description}.
+
+## Trainee Profile (use this to personalize your responses):
+${profileMarkdown}
+
+## Your Persona:
+- Level: ${customTeacher?.level || 'general'}
+- Personality: ${customTeacher?.personality || 'friendly'}
+
+## Your Rules:
+1. Be warm, professional, and encouraging
+2. Personalize responses based on trainee's strengths and weaknesses
+3. Don't just answer - ask questions to test true comprehension
+4. Focus on practical application in the Saudi real estate market
+5. Provide constructive feedback while being supportive
+6. If asked about off-topic subjects, gently redirect to training focus`;
+    }
+
+    // Append lesson context and attachments
+    if (lessonContextSection) {
+      systemPrompt += '\n' + lessonContextSection;
+    }
+    if (attachmentContext) {
+      systemPrompt += '\n' + attachmentContext;
+    }
+
+    return systemPrompt;
+  }
+
+  /**
+   * Generate greeting for custom teachers (from database)
+   */
+  private async generateCustomTeacherGreeting(profile: TraineeProfile, isArabic: boolean, teacherName: string): Promise<string> {
+    // Fetch custom teacher from database
+    const customTeacher = await this.prisma.aITeacher.findFirst({
+      where: { name: teacherName.toLowerCase() },
+      select: {
+        displayNameAr: true,
+        displayNameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        personality: true,
+        systemPromptAr: true,
+        systemPromptEn: true,
+      },
+    });
+
+    const displayName = isArabic
+      ? (customTeacher?.displayNameAr || teacherName)
+      : (customTeacher?.displayNameEn || teacherName);
+
+    const description = isArabic
+      ? (customTeacher?.descriptionAr || '')
+      : (customTeacher?.descriptionEn || '');
+
+    const prompt = isArabic
+      ? `أنت ${displayName}، ${description || 'معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين'}.
+
+اكتب تحية ترحيبية قصيرة وشخصية (2-3 جمل فقط) للمتدرب.
+
+اسم المتدرب: ${profile.firstName} ${profile.lastName}
+عدد الجلسات المكتملة: ${profile.totalSessions}
+متوسط الدرجات: ${profile.averageScore}%
+
+اكتب باللهجة السعودية الودية وعرف نفسك باسمك.`
+      : `You are ${displayName}, ${description || 'an AI teacher specializing in training Saudi real estate agents'}.
+
+Write a short, personalized welcome greeting (2-3 sentences only) for the trainee.
+
+Trainee name: ${profile.firstName} ${profile.lastName}
+Sessions completed: ${profile.totalSessions}
+Average score: ${profile.averageScore}%
+
+Be warm and professional, and introduce yourself by name.`;
+
+    return this.fallbackProvider.complete({
+      prompt,
+      maxTokens: 300,
+      temperature: 0.7,
+    });
+  }
+
   async sendMessage(traineeId: string, message: string, attachments?: FileAttachment[], lessonContext?: LessonContext, teacherName?: string): Promise<ChatResponse> {
     // Get profile for context
     const profile = await this.getOrCreateProfile(traineeId);
@@ -830,11 +982,19 @@ ${lessonContext.videoDurationMinutes ? `- **Video Duration**: ${lessonContext.vi
 
     // System prompt: use persona-specific if teacherName provided, else generic
     let systemPrompt: string;
-    if (teacherName && isValidTeacherName(teacherName)) {
-      systemPrompt = await this.buildPersonaSystemPrompt(
-        traineeId, teacherName as TeacherPersonaName, profileMarkdown,
-        lessonContextSection, attachmentContext, isArabic, message
-      );
+    if (teacherName) {
+      if (isValidTeacherName(teacherName)) {
+        // Use static persona for built-in teachers
+        systemPrompt = await this.buildPersonaSystemPrompt(
+          traineeId, teacherName as TeacherPersonaName, profileMarkdown,
+          lessonContextSection, attachmentContext, isArabic, message
+        );
+      } else {
+        // Use custom teacher from database
+        systemPrompt = await this.buildCustomTeacherSystemPrompt(
+          teacherName, profileMarkdown, lessonContextSection, attachmentContext, isArabic
+        );
+      }
     } else {
       systemPrompt = isArabic
         ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.
@@ -946,11 +1106,18 @@ ${attachmentContext}`;
 
     // System prompt: use persona-specific if teacherName provided, else generic
     let systemPrompt: string;
-    if (teacherName && isValidTeacherName(teacherName)) {
-      systemPrompt = await this.buildPersonaSystemPrompt(
-        traineeId, teacherName as TeacherPersonaName, profileMarkdown,
-        lessonContextSection, attachmentContext, isArabic, message
-      );
+    if (teacherName) {
+      if (isValidTeacherName(teacherName)) {
+        systemPrompt = await this.buildPersonaSystemPrompt(
+          traineeId, teacherName as TeacherPersonaName, profileMarkdown,
+          lessonContextSection, attachmentContext, isArabic, message
+        );
+      } else {
+        // Custom teacher from database
+        systemPrompt = await this.buildCustomTeacherSystemPrompt(
+          teacherName, profileMarkdown, lessonContextSection, attachmentContext, isArabic
+        );
+      }
     } else {
       systemPrompt = isArabic
         ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي${attachmentContext}`
@@ -1376,13 +1543,43 @@ Respond in JSON only:
 
   /**
    * Generate welcome message audio for a teacher persona
-   * Uses pre-defined welcome messages from config for instant response
+   * Uses pre-defined welcome messages from config for static teachers,
+   * or fetches from database for custom teachers
    */
   async generateWelcomeAudio(teacherName: string, language: 'ar' | 'en'): Promise<{
     message: string;
     audio: string;
   }> {
-    const welcomeMessage = getTeacherWelcome(teacherName, language);
+    let welcomeMessage: string;
+
+    // Check if it's a static teacher
+    if (isStaticTeacher(teacherName)) {
+      welcomeMessage = getTeacherWelcome(teacherName, language);
+    } else {
+      // Fetch from database for custom teachers
+      const customTeacher = await this.prisma.aITeacher.findFirst({
+        where: { name: teacherName.toLowerCase() },
+        select: {
+          welcomeMessageAr: true,
+          welcomeMessageEn: true,
+          displayNameAr: true,
+          displayNameEn: true,
+        },
+      });
+
+      if (customTeacher) {
+        const displayName = language === 'ar' ? customTeacher.displayNameAr : customTeacher.displayNameEn;
+        welcomeMessage = language === 'ar'
+          ? (customTeacher.welcomeMessageAr || `أهلاً وسهلاً! أنا ${displayName}، كيف أقدر أساعدك اليوم؟`)
+          : (customTeacher.welcomeMessageEn || `Welcome! I'm ${displayName}, how can I help you today?`);
+      } else {
+        // Fallback to generic welcome
+        welcomeMessage = language === 'ar'
+          ? `أهلاً وسهلاً! كيف أقدر أساعدك اليوم؟`
+          : `Welcome! How can I help you today?`;
+      }
+    }
+
     const audio = await this.textToSpeech(welcomeMessage, language, teacherName);
     return { message: welcomeMessage, audio };
   }

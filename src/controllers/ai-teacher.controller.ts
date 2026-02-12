@@ -319,11 +319,7 @@ export class AITeacherController {
       const traineeId = req.user!.userId;
       const teacherName = req.query.teacherName as string | undefined;
 
-      if (teacherName && !isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
-        return;
-      }
-
+      // Accept any teacherName - custom teachers supported via database
       const welcome = await this.aiTeacherService.generateWelcome(traineeId, teacherName);
       res.status(200).json(welcome);
     } catch (error) {
@@ -341,11 +337,7 @@ export class AITeacherController {
         return;
       }
 
-      if (teacherName && !isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
-        return;
-      }
-
+      // Accept any teacherName - custom teachers supported via database
       const response = await this.aiTeacherService.sendMessage(traineeId, message, attachments, lessonContext, teacherName);
       res.status(200).json(response);
     } catch (error) {
@@ -367,10 +359,7 @@ export class AITeacherController {
         return;
       }
 
-      if (teacherName && !isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
-        return;
-      }
+      // Accept any teacherName - custom teachers supported via database
 
       // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -422,11 +411,7 @@ export class AITeacherController {
       const limit = parseInt(req.query.limit as string) || 10;
       const teacherName = req.query.teacherName as string | undefined;
 
-      if (teacherName && !isValidTeacherName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah' });
-        return;
-      }
-
+      // Accept any teacherName - custom teachers supported via database
       const history = await this.aiTeacherService.getSessionHistory(traineeId, limit, teacherName);
       res.status(200).json(history);
     } catch (error) {
@@ -457,8 +442,10 @@ export class AITeacherController {
         return;
       }
 
-      if (teacherName && !isValidVoiceName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah, sara' });
+      // Accept any teacherName - custom teachers will be looked up in database
+      // Only validate that it's a non-empty string if provided
+      if (teacherName && typeof teacherName !== 'string') {
+        res.status(400).json({ error: 'teacherName must be a string' });
         return;
       }
 
@@ -481,8 +468,9 @@ export class AITeacherController {
       const teacherName = req.query.teacherName as string || 'ahmed';
       const language = (req.query.language as string) === 'en' ? 'en' : 'ar';
 
-      if (!isValidVoiceName(teacherName)) {
-        res.status(400).json({ error: 'Invalid teacherName. Must be one of: ahmed, noura, anas, abdullah, sara' });
+      // Accept any teacherName - custom teachers will be looked up in database
+      if (!teacherName || typeof teacherName !== 'string') {
+        res.status(400).json({ error: 'teacherName must be a non-empty string' });
         return;
       }
 

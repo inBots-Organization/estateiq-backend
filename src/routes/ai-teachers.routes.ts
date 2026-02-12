@@ -697,7 +697,7 @@ router.get('/avatar-stats', async (req: Request, res: Response) => {
 // DYNAMIC ROUTES - These use :id parameter
 // ═══════════════════════════════════════════════════════════════════════════
 
-// GET /api/admin/ai-teachers/:id - Get single AI teacher with details
+// GET /api/admin/ai-teachers/:id - Get single AI teacher with details (without avatar for speed)
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const prisma = container.resolve<PrismaClient>('PrismaClient');
@@ -708,9 +708,32 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Organization context required' });
     }
 
+    // Exclude avatarUrl for fast loading - loaded separately via /:id/avatar
     const teacher = await prisma.aITeacher.findFirst({
       where: { id, organizationId },
-      include: {
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        displayNameAr: true,
+        displayNameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        // avatarUrl excluded - loaded separately
+        personality: true,
+        level: true,
+        voiceId: true,
+        systemPromptAr: true,
+        systemPromptEn: true,
+        welcomeMessageAr: true,
+        welcomeMessageEn: true,
+        brainQueryPrefix: true,
+        contextSource: true,
+        sortOrder: true,
+        isDefault: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: {
             assignedTrainees: true,
@@ -728,6 +751,33 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching AI teacher:', error);
     res.status(500).json({ error: 'Failed to fetch AI teacher' });
+  }
+});
+
+// GET /api/admin/ai-teachers/:id/avatar - Get single teacher avatar (for lazy loading)
+router.get('/:id/avatar', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+    const { id } = req.params;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id, organizationId },
+      select: { avatarUrl: true },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    res.json({ avatarUrl: teacher.avatarUrl });
+  } catch (error) {
+    console.error('Error fetching avatar:', error);
+    res.status(500).json({ error: 'Failed to fetch avatar' });
   }
 });
 

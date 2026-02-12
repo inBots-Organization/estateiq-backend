@@ -147,6 +147,13 @@ export class AITeacherController {
       this.getAssignedTeacher.bind(this)
     );
 
+    // Get teacher info by name (for displaying avatar, names, etc)
+    this.router.get(
+      '/teacher-info/:name',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.getTeacherInfo.bind(this)
+    );
+
     // Voice endpoints
     this.router.post(
       '/tts',
@@ -424,6 +431,34 @@ export class AITeacherController {
       const traineeId = req.user!.userId;
       const result = await this.aiTeacherService.getAssignedTeacher(traineeId);
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get teacher info by name (avatar, displayName, voiceId, etc)
+   * Used by frontend to display teacher info dynamically
+   * GET /api/ai-teacher/teacher-info/:name
+   */
+  private async getTeacherInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { name } = req.params;
+      const organizationId = req.user?.organizationId;
+
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Teacher name is required' });
+        return;
+      }
+
+      const teacherInfo = await this.aiTeacherService.getTeacherInfo(name, organizationId);
+
+      if (!teacherInfo) {
+        res.status(404).json({ error: 'Teacher not found' });
+        return;
+      }
+
+      res.status(200).json(teacherInfo);
     } catch (error) {
       next(error);
     }

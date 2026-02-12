@@ -1557,32 +1557,41 @@ Respond in JSON only:
   }> {
     let welcomeMessage: string;
 
-    // Check if it's a static teacher
-    if (isStaticTeacher(teacherName)) {
-      welcomeMessage = getTeacherWelcome(teacherName, language);
-    } else {
-      // Fetch from database for custom teachers
-      const customTeacher = await this.prisma.aITeacher.findFirst({
-        where: { name: teacherName.toLowerCase() },
-        select: {
-          welcomeMessageAr: true,
-          welcomeMessageEn: true,
-          displayNameAr: true,
-          displayNameEn: true,
-        },
-      });
+    // PRIORITY: Check database first (allows admin to customize any teacher's welcome message)
+    const customTeacher = await this.prisma.aITeacher.findFirst({
+      where: { name: teacherName.toLowerCase() },
+      select: {
+        welcomeMessageAr: true,
+        welcomeMessageEn: true,
+        displayNameAr: true,
+        displayNameEn: true,
+      },
+    });
 
-      if (customTeacher) {
+    if (customTeacher) {
+      const dbWelcome = language === 'ar' ? customTeacher.welcomeMessageAr : customTeacher.welcomeMessageEn;
+
+      if (dbWelcome) {
+        // Use database welcome message (admin customized)
+        welcomeMessage = dbWelcome;
+      } else if (isStaticTeacher(teacherName)) {
+        // Fallback to static config for built-in teachers
+        welcomeMessage = getTeacherWelcome(teacherName, language);
+      } else {
+        // Fallback for custom teachers without welcome message
         const displayName = language === 'ar' ? customTeacher.displayNameAr : customTeacher.displayNameEn;
         welcomeMessage = language === 'ar'
-          ? (customTeacher.welcomeMessageAr || `أهلاً وسهلاً! أنا ${displayName}، كيف أقدر أساعدك اليوم؟`)
-          : (customTeacher.welcomeMessageEn || `Welcome! I'm ${displayName}, how can I help you today?`);
-      } else {
-        // Fallback to generic welcome
-        welcomeMessage = language === 'ar'
-          ? `أهلاً وسهلاً! كيف أقدر أساعدك اليوم؟`
-          : `Welcome! How can I help you today?`;
+          ? `أهلاً وسهلاً! أنا ${displayName}، كيف أقدر أساعدك اليوم؟`
+          : `Welcome! I'm ${displayName}, how can I help you today?`;
       }
+    } else if (isStaticTeacher(teacherName)) {
+      // Teacher not in database but is a static teacher - use static config
+      welcomeMessage = getTeacherWelcome(teacherName, language);
+    } else {
+      // Fallback to generic welcome
+      welcomeMessage = language === 'ar'
+        ? `أهلاً وسهلاً! كيف أقدر أساعدك اليوم؟`
+        : `Welcome! How can I help you today?`;
     }
 
     const audio = await this.textToSpeech(welcomeMessage, language, teacherName);
@@ -2130,5 +2139,79 @@ Mix between multiple choice (4 options) and true/false questions. Focus on pract
     ];
 
     return { timestamps };
+  }
+
+  // ============================================================================
+  // TEACHER INFO
+  // ============================================================================
+
+  /**
+   * Get teacher info by name (avatar, displayName, voiceId, etc)
+   * Used by frontend to display teacher info dynamically
+   * Priority: database first, then static config fallback
+   */
+  async getTeacherInfo(teacherName: string, organizationId?: string): Promise<{
+    name: string;
+    displayNameAr: string;
+    displayNameEn: string;
+    descriptionAr: string;
+    descriptionEn: string;
+    avatarUrl: string | null;
+    voiceId: string | null;
+    personality: string | null;
+    level: string | null;
+  } | null> {
+    // First, try to find in database
+    const dbTeacher = await this.prisma.aITeacher.findFirst({
+      where: {
+        name: teacherName.toLowerCase(),
+        ...(organizationId && { organizationId }),
+      },
+      select: {
+        name: true,
+        displayNameAr: true,
+        displayNameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        avatarUrl: true,
+        voiceId: true,
+        personality: true,
+        level: true,
+      },
+    });
+
+    if (dbTeacher) {
+      return {
+        name: dbTeacher.name,
+        displayNameAr: dbTeacher.displayNameAr || dbTeacher.name,
+        displayNameEn: dbTeacher.displayNameEn || dbTeacher.name,
+        descriptionAr: dbTeacher.descriptionAr || '',
+        descriptionEn: dbTeacher.descriptionEn || '',
+        avatarUrl: dbTeacher.avatarUrl,
+        voiceId: dbTeacher.voiceId,
+        personality: dbTeacher.personality,
+        level: dbTeacher.level,
+      };
+    }
+
+    // Fallback to static config for built-in teachers
+    if (isStaticTeacher(teacherName)) {
+      const voiceConfig = getTeacherVoiceId(teacherName);
+      const persona = isValidTeacherName(teacherName) ? TEACHER_PERSONAS[teacherName] : null;
+
+      return {
+        name: teacherName,
+        displayNameAr: persona?.displayName.ar || teacherName,
+        displayNameEn: persona?.displayName.en || teacherName,
+        descriptionAr: '',
+        descriptionEn: '',
+        avatarUrl: `https://estateiq-app.vercel.app/avatars/${teacherName}.png`,
+        voiceId: voiceConfig,
+        personality: null,
+        level: null,
+      };
+    }
+
+    return null;
   }
 }

@@ -471,6 +471,7 @@ export class AITeacherController {
   private async textToSpeech(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { text, language, teacherName, voiceId } = req.body;
+      const organizationId = req.user?.organizationId;
 
       if (!text || typeof text !== 'string') {
         res.status(400).json({ error: 'Text is required' });
@@ -486,7 +487,8 @@ export class AITeacherController {
 
       const lang = language === 'en' ? 'en' : 'ar';
       // If voiceId is provided directly (e.g., for preview), use it; otherwise use teacherName lookup
-      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang, teacherName, voiceId);
+      // Pass organizationId to get the correct teacher for this user's organization
+      const audioBase64 = await this.aiTeacherService.textToSpeech(text, lang, teacherName, voiceId, organizationId);
 
       res.status(200).json({ audio: audioBase64 });
     } catch (error) {
@@ -503,6 +505,7 @@ export class AITeacherController {
     try {
       const teacherName = req.query.teacherName as string || 'ahmed';
       const language = (req.query.language as string) === 'en' ? 'en' : 'ar';
+      const organizationId = req.user?.organizationId;
 
       // Accept any teacherName - custom teachers will be looked up in database
       if (!teacherName || typeof teacherName !== 'string') {
@@ -510,7 +513,8 @@ export class AITeacherController {
         return;
       }
 
-      const result = await this.aiTeacherService.generateWelcomeAudio(teacherName, language);
+      // Pass organizationId to get the correct teacher for this user's organization
+      const result = await this.aiTeacherService.generateWelcomeAudio(teacherName, language, organizationId);
       res.status(200).json(result);
     } catch (error) {
       next(error);

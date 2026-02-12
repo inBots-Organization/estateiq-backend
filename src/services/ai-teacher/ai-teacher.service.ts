@@ -1487,7 +1487,7 @@ Respond in JSON only:
    * @param language - Language code ('ar' or 'en')
    * @param teacherName - Optional teacher name for persona-specific voice
    */
-  async textToSpeech(text: string, language: 'ar' | 'en', teacherName?: string, directVoiceId?: string): Promise<string> {
+  async textToSpeech(text: string, language: 'ar' | 'en', teacherName?: string, directVoiceId?: string, organizationId?: string): Promise<string> {
     if (!this.elevenLabsApiKey) {
       throw new Error('ElevenLabs API key not configured');
     }
@@ -1500,8 +1500,12 @@ Respond in JSON only:
       voiceId = directVoiceId;
     } else if (teacherName) {
       // First, check database for custom voiceId (allows admin to override any teacher's voice)
+      // IMPORTANT: Use organizationId to get the correct teacher for this user's organization
       const teacherFromDb = await this.prisma.aITeacher.findFirst({
-        where: { name: teacherName.toLowerCase() },
+        where: {
+          name: teacherName.toLowerCase(),
+          ...(organizationId && { organizationId }),
+        },
         select: { voiceId: true },
       });
 
@@ -1555,15 +1559,19 @@ Respond in JSON only:
    * Uses pre-defined welcome messages from config for static teachers,
    * or fetches from database for custom teachers
    */
-  async generateWelcomeAudio(teacherName: string, language: 'ar' | 'en'): Promise<{
+  async generateWelcomeAudio(teacherName: string, language: 'ar' | 'en', organizationId?: string): Promise<{
     message: string;
     audio: string;
   }> {
     let welcomeMessage: string;
 
     // PRIORITY: Check database first (allows admin to customize any teacher's welcome message)
+    // IMPORTANT: Use organizationId to get the correct teacher for this user's organization
     const customTeacher = await this.prisma.aITeacher.findFirst({
-      where: { name: teacherName.toLowerCase() },
+      where: {
+        name: teacherName.toLowerCase(),
+        ...(organizationId && { organizationId }),
+      },
       select: {
         welcomeMessageAr: true,
         welcomeMessageEn: true,
@@ -1598,7 +1606,7 @@ Respond in JSON only:
         : `Welcome! How can I help you today?`;
     }
 
-    const audio = await this.textToSpeech(welcomeMessage, language, teacherName);
+    const audio = await this.textToSpeech(welcomeMessage, language, teacherName, undefined, organizationId);
     return { message: welcomeMessage, audio };
   }
 

@@ -511,6 +511,64 @@ router.post('/sync-avatars', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ai-teachers/fix-base64-avatars - Convert base64 avatars to static URLs
+router.post('/fix-base64-avatars', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Find all teachers with base64 avatars
+    const teachersWithBase64 = await prisma.aITeacher.findMany({
+      where: {
+        organizationId,
+        avatarUrl: { startsWith: 'data:' },
+      },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (teachersWithBase64.length === 0) {
+      return res.json({ message: 'No teachers with base64 avatars found', fixedCount: 0 });
+    }
+
+    // Static avatar base URL (Vercel deployment)
+    const AVATAR_BASE_URL = 'https://estateiq-app.vercel.app/avatars';
+
+    // Update each teacher with static URL
+    const results = await Promise.all(
+      teachersWithBase64.map(async (teacher) => {
+        // Use .webp extension for custom teachers, fallback to existing static avatars
+        const staticUrl = `${AVATAR_BASE_URL}/${teacher.name}.webp`;
+
+        return prisma.aITeacher.update({
+          where: { id: teacher.id },
+          data: { avatarUrl: staticUrl },
+        });
+      })
+    );
+
+    res.json({
+      message: `Fixed ${results.length} teachers with base64 avatars`,
+      fixedCount: results.length,
+      teachers: results.map(t => ({
+        name: t.name,
+        newAvatarUrl: t.avatarUrl,
+      })),
+      note: 'Make sure the avatar files exist at the static URLs!',
+    });
+  } catch (error) {
+    console.error('Error fixing base64 avatars:', error);
+    res.status(500).json({ error: 'Failed to fix base64 avatars' });
+  }
+});
+
 // POST /api/admin/ai-teachers/reset-evaluations - Reset all trainee evaluations
 router.post('/reset-evaluations', async (req: Request, res: Response) => {
   try {
@@ -1277,6 +1335,56 @@ router.get('/:id/documents', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/admin/ai-teachers/:id/avatar-url - Set avatar URL directly (for static/external avatars)
+router.put('/:id/avatar-url', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+    const { id } = req.params;
+    const { avatarUrl } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    if (!avatarUrl || typeof avatarUrl !== 'string') {
+      return res.status(400).json({ error: 'avatarUrl is required' });
+    }
+
+    // Don't allow base64 URLs - they're too large
+    if (avatarUrl.startsWith('data:')) {
+      return res.status(400).json({ error: 'Base64 URLs are not allowed. Use a direct URL instead.' });
+    }
+
+    // Verify teacher exists
+    const teacher = await prisma.aITeacher.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+
+    const updatedTeacher = await prisma.aITeacher.update({
+      where: { id },
+      data: { avatarUrl },
+      include: {
+        _count: {
+          select: {
+            assignedTrainees: true,
+            documents: true,
+          },
+        },
+      },
+    });
+
+    res.json({ teacher: updatedTeacher });
+  } catch (error) {
+    console.error('Error setting avatar URL:', error);
+    res.status(500).json({ error: 'Failed to set avatar URL' });
+  }
+});
+
 // POST /api/admin/ai-teachers/:id/avatar - Upload teacher avatar
 router.post('/:id/avatar', (req: Request, res: Response, next) => {
   // Handle multer upload with proper error handling
@@ -1315,7 +1423,14 @@ router.post('/:id/avatar', (req: Request, res: Response, next) => {
         return res.status(404).json({ error: 'Teacher not found' });
       }
 
-      // Convert to base64 data URL for now (can be replaced with cloud storage later)
+      // Generate a unique filename based on teacher name and timestamp
+      const timestamp = Date.now();
+      const extension = req.file.mimetype === 'image/webp' ? 'webp' :
+                       req.file.mimetype === 'image/png' ? 'png' : 'jpg';
+      const fileName = `${teacher.name}-${timestamp}.${extension}`;
+
+      // For now, store as base64 but return a warning
+      // In production, this should upload to GCS/S3 and return a URL
       const base64 = req.file.buffer.toString('base64');
       const avatarUrl = `data:${req.file.mimetype};base64,${base64}`;
 
@@ -1332,7 +1447,18 @@ router.post('/:id/avatar', (req: Request, res: Response, next) => {
         },
       });
 
-      res.json({ teacher: updatedTeacher });
+      // Return teacher without the full base64 in response (to avoid huge responses)
+      // The frontend should use the static URL pattern instead
+      res.json({
+        teacher: {
+          ...updatedTeacher,
+          avatarUrl: updatedTeacher.avatarUrl?.startsWith('data:')
+            ? `[base64 stored - use static URL: https://estateiq-app.vercel.app/avatars/${teacher.name}.webp]`
+            : updatedTeacher.avatarUrl,
+        },
+        warning: 'Base64 avatar stored. For better performance, upload the image to /public/avatars/ and use PUT /avatar-url to set the URL.',
+        suggestedUrl: `https://estateiq-app.vercel.app/avatars/${teacher.name}.webp`,
+      });
     } catch (error) {
       console.error('Error uploading avatar:', error);
       res.status(500).json({ error: 'Failed to upload avatar' });

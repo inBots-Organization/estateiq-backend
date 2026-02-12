@@ -85,6 +85,11 @@ export class AuthService implements IAuthService {
         })
       : null;
 
+    // Don't include base64 avatar in response - it's too large for localStorage
+    // Only include URL-based avatars (not data: URIs)
+    const avatarUrl = traineeWithTeacher?.assignedTeacherRecord?.avatarUrl;
+    const safeAvatarUrl = avatarUrl && !avatarUrl.startsWith('data:') ? avatarUrl : null;
+
     return {
       accessToken,
       user: {
@@ -98,7 +103,7 @@ export class AuthService implements IAuthService {
         assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
         assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
         currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
-        assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
+        assignedTeacherAvatar: safeAvatarUrl,
         assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
         assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
         assignedTeacherVoiceId: traineeWithTeacher?.assignedTeacherRecord?.voiceId || null,
@@ -233,6 +238,10 @@ export class AuthService implements IAuthService {
         })
       : null;
 
+    // Don't include base64 avatar in response - it's too large for localStorage
+    const refreshAvatarUrl = traineeWithTeacher?.assignedTeacherRecord?.avatarUrl;
+    const safeRefreshAvatarUrl = refreshAvatarUrl && !refreshAvatarUrl.startsWith('data:') ? refreshAvatarUrl : null;
+
     return {
       accessToken,
       user: {
@@ -245,7 +254,7 @@ export class AuthService implements IAuthService {
         assignedTeacher: traineeWithTeacher?.assignedTeacher || null,
         assignedTeacherId: traineeWithTeacher?.assignedTeacherId || null,
         currentSkillLevel: traineeWithTeacher?.currentSkillLevel || null,
-        assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
+        assignedTeacherAvatar: safeRefreshAvatarUrl,
         assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
         assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
         assignedTeacherVoiceId: traineeWithTeacher?.assignedTeacherRecord?.voiceId || null,

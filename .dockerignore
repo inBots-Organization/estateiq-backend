@@ -12,3 +12,4 @@ vitest.config.ts
 jest.config.js
 .eslintrc.*
 dist
+scripts

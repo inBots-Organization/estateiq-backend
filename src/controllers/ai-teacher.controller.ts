@@ -444,7 +444,7 @@ export class AITeacherController {
   private async getTeacherInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { name } = req.params;
-      const organizationId = req.user?.organizationId;
+      const organizationId = req.user?.organizationId ?? undefined;
 
       if (!name || typeof name !== 'string') {
         res.status(400).json({ error: 'Teacher name is required' });
@@ -471,7 +471,7 @@ export class AITeacherController {
   private async textToSpeech(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { text, language, teacherName, voiceId } = req.body;
-      const organizationId = req.user?.organizationId;
+      const organizationId = req.user?.organizationId ?? undefined;
 
       if (!text || typeof text !== 'string') {
         res.status(400).json({ error: 'Text is required' });
@@ -505,7 +505,7 @@ export class AITeacherController {
     try {
       const teacherName = req.query.teacherName as string || 'ahmed';
       const language = (req.query.language as string) === 'en' ? 'en' : 'ar';
-      const organizationId = req.user?.organizationId;
+      const organizationId = req.user?.organizationId ?? undefined;
 
       // Accept any teacherName - custom teachers will be looked up in database
       if (!teacherName || typeof teacherName !== 'string') {

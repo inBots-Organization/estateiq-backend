@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { ITraineeRepository } from '../repositories/interfaces/trainee.repository.interface';
 import multer from 'multer';
+import sharp from 'sharp';
 
 const router = Router();
 
@@ -1162,9 +1163,17 @@ router.post('/:id/avatar', (req: Request, res: Response, next) => {
         return res.status(404).json({ error: 'Teacher not found' });
       }
 
-      // Convert to base64 data URL for now (can be replaced with GCS later)
-      const base64 = req.file.buffer.toString('base64');
-      const avatarUrl = `data:${req.file.mimetype};base64,${base64}`;
+      // Convert image to WebP format for smaller file size (better quality/size ratio)
+      const webpBuffer = await sharp(req.file.buffer)
+        .webp({ quality: 85 }) // High quality WebP
+        .resize(512, 512, { fit: 'cover', withoutEnlargement: true }) // Max 512x512 for avatars
+        .toBuffer();
+
+      // Convert to base64 data URL
+      const base64 = webpBuffer.toString('base64');
+      const avatarUrl = `data:image/webp;base64,${base64}`;
+
+      console.log(`Avatar converted: ${req.file.size} bytes → ${webpBuffer.length} bytes (${Math.round((1 - webpBuffer.length / req.file.size) * 100)}% smaller)`);
 
       const updatedTeacher = await prisma.aITeacher.update({
         where: { id },

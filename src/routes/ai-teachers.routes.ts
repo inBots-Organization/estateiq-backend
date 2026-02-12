@@ -365,17 +365,8 @@ router.get('/', async (req: Request, res: Response) => {
           },
         });
 
-        // Truncate avatarUrl for list view (full URL loaded on detail page)
-        // Keep external URLs as-is, truncate base64 data URLs
-        let avatarUrlForList = teacher.avatarUrl;
-        if (teacher.avatarUrl && teacher.avatarUrl.startsWith('data:')) {
-          // For base64, just indicate it exists - frontend will load full on detail
-          avatarUrlForList = teacher.avatarUrl.substring(0, 100) + '...';
-        }
-
         return {
           ...teacher,
-          avatarUrl: avatarUrlForList,
           _count: {
             ...teacher._count,
             assignedTrainees: traineeCount,

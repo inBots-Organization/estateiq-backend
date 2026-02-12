@@ -28,7 +28,7 @@ import { ILLMProvider } from '../../providers/llm/llm-provider.interface';
 import { FallbackLLMProvider } from '../../providers/llm/fallback.provider';
 import { BrainService } from '../brain/brain.service';
 import { TEACHER_PERSONAS, TeacherPersonaName, isValidTeacherName } from './teacher-personas.config';
-import { getTeacherVoiceId, getTeacherWelcome } from '../../config/teacher-voices.config';
+import { getTeacherVoiceId, getTeacherWelcome, isStaticTeacher } from '../../config/teacher-voices.config';
 
 // Constants
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'trainee-profiles');
@@ -1325,10 +1325,23 @@ Respond in JSON only:
       throw new Error('ElevenLabs API key not configured');
     }
 
-    // Use teacher-specific voice if provided, otherwise fallback to language default
-    const voiceId = teacherName
-      ? getTeacherVoiceId(teacherName)
-      : VOICE_IDS[language];
+    // Get voice ID - check static config first, then database for custom teachers
+    let voiceId: string;
+    if (teacherName) {
+      if (isStaticTeacher(teacherName)) {
+        // Use static config for built-in teachers
+        voiceId = getTeacherVoiceId(teacherName);
+      } else {
+        // For custom teachers, fetch from database
+        const customTeacher = await this.prisma.aITeacher.findFirst({
+          where: { name: teacherName.toLowerCase() },
+          select: { voiceId: true },
+        });
+        voiceId = customTeacher?.voiceId || VOICE_IDS[language];
+      }
+    } else {
+      voiceId = VOICE_IDS[language];
+    }
 
     // Use eleven_turbo_v2_5 for faster generation with good quality
     // For Arabic, use eleven_multilingual_v2 for better pronunciation

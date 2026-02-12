@@ -66,10 +66,18 @@ export function getTeacherVoice(teacherName: string): TeacherVoiceConfig {
 }
 
 /**
- * Get just the voice ID for a teacher
+ * Get just the voice ID for a teacher from static config
+ * Falls back to ahmed if not found
  */
 export function getTeacherVoiceId(teacherName: string): string {
   return getTeacherVoice(teacherName).voiceId;
+}
+
+/**
+ * Check if teacher exists in static config
+ */
+export function isStaticTeacher(teacherName: string): boolean {
+  return teacherName.toLowerCase() in TEACHER_VOICES;
 }
 
 /**

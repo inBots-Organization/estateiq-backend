@@ -35,6 +35,7 @@ export interface AuthResult {
     assignedTeacherAvatar?: string | null;
     assignedTeacherDisplayNameAr?: string | null;
     assignedTeacherDisplayNameEn?: string | null;
+    assignedTeacherVoiceId?: string | null;
   };
 }
 

@@ -78,6 +78,7 @@ export class AuthService implements IAuthService {
                 avatarUrl: true,
                 displayNameAr: true,
                 displayNameEn: true,
+                voiceId: true,
               },
             },
           },
@@ -100,6 +101,7 @@ export class AuthService implements IAuthService {
         assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
         assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
         assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
+        assignedTeacherVoiceId: traineeWithTeacher?.assignedTeacherRecord?.voiceId || null,
       },
     };
   }
@@ -224,6 +226,7 @@ export class AuthService implements IAuthService {
                 avatarUrl: true,
                 displayNameAr: true,
                 displayNameEn: true,
+                voiceId: true,
               },
             },
           },
@@ -245,6 +248,7 @@ export class AuthService implements IAuthService {
         assignedTeacherAvatar: traineeWithTeacher?.assignedTeacherRecord?.avatarUrl || null,
         assignedTeacherDisplayNameAr: traineeWithTeacher?.assignedTeacherRecord?.displayNameAr || null,
         assignedTeacherDisplayNameEn: traineeWithTeacher?.assignedTeacherRecord?.displayNameEn || null,
+        assignedTeacherVoiceId: traineeWithTeacher?.assignedTeacherRecord?.voiceId || null,
       },
     };
   }

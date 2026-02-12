@@ -298,11 +298,30 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Organization context required' });
     }
 
-    // Get teachers with document counts
+    // Get teachers with document counts (exclude full avatarUrl for performance - it's loaded separately)
     let teachers = await prisma.aITeacher.findMany({
       where: { organizationId },
       orderBy: { sortOrder: 'asc' },
-      include: {
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        displayNameAr: true,
+        displayNameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        // Return truncated avatar URL (just first 100 chars to check if it exists)
+        avatarUrl: true,
+        personality: true,
+        level: true,
+        voiceId: true,
+        brainQueryPrefix: true,
+        contextSource: true,
+        sortOrder: true,
+        isDefault: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: {
             documents: true,
@@ -346,8 +365,17 @@ router.get('/', async (req: Request, res: Response) => {
           },
         });
 
+        // Truncate avatarUrl for list view (full URL loaded on detail page)
+        // Keep external URLs as-is, truncate base64 data URLs
+        let avatarUrlForList = teacher.avatarUrl;
+        if (teacher.avatarUrl && teacher.avatarUrl.startsWith('data:')) {
+          // For base64, just indicate it exists - frontend will load full on detail
+          avatarUrlForList = teacher.avatarUrl.substring(0, 100) + '...';
+        }
+
         return {
           ...teacher,
+          avatarUrl: avatarUrlForList,
           _count: {
             ...teacher._count,
             assignedTrainees: traineeCount,

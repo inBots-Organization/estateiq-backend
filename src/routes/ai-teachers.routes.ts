@@ -1094,8 +1094,15 @@ router.get('/:id/documents', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Teacher not found' });
     }
 
+    // Get documents by teacherId OR by legacy targetPersona (teacher name)
     const documents = await prisma.brainDocument.findMany({
-      where: { teacherId: id, organizationId },
+      where: {
+        organizationId,
+        OR: [
+          { teacherId: id },
+          { targetPersona: teacher.name }, // Legacy field - teacher name like "firas", "noura"
+        ],
+      },
       select: {
         id: true,
         title: true,

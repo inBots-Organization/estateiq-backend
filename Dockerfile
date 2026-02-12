@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install build dependencies for sharp
+RUN apk add --no-cache python3 make g++ vips-dev
+
 # Copy package files
 COPY package*.json ./
 
@@ -25,13 +28,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+# Install OpenSSL for Prisma and dependencies for sharp (image processing)
+RUN apk add --no-cache openssl vips-dev
 
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only
+# Install production dependencies only (rebuild sharp for Alpine)
 RUN npm ci --only=production
 
 # Copy prisma schema and generate client

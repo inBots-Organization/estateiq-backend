@@ -298,7 +298,8 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Organization context required' });
     }
 
-    // Get teachers with document counts (exclude full avatarUrl for performance - it's loaded separately)
+    // Get teachers WITHOUT avatarUrl for fast initial load
+    // Avatars are loaded separately via /avatars endpoint
     let teachers = await prisma.aITeacher.findMany({
       where: { organizationId },
       orderBy: { sortOrder: 'asc' },
@@ -310,8 +311,7 @@ router.get('/', async (req: Request, res: Response) => {
         displayNameEn: true,
         descriptionAr: true,
         descriptionEn: true,
-        // Return truncated avatar URL (just first 100 chars to check if it exists)
-        avatarUrl: true,
+        // EXCLUDE avatarUrl - loaded separately for performance
         personality: true,
         level: true,
         voiceId: true,
@@ -606,6 +606,37 @@ router.post('/force-resync', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error force-resyncing teachers:', error);
     res.status(500).json({ error: 'Failed to force-resync teachers' });
+  }
+});
+
+// GET /api/admin/ai-teachers/avatars - Get all teacher avatars (for lazy loading)
+router.get('/avatars', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    const teachers = await prisma.aITeacher.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        avatarUrl: true,
+      },
+    });
+
+    // Return as a map for easy lookup
+    const avatars: Record<string, string | null> = {};
+    teachers.forEach((t) => {
+      avatars[t.id] = t.avatarUrl;
+    });
+
+    res.json({ avatars });
+  } catch (error) {
+    console.error('Error fetching avatars:', error);
+    res.status(500).json({ error: 'Failed to fetch avatars' });
   }
 });
 

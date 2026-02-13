@@ -489,6 +489,119 @@ ${sessionNotesSection}
   }
 
   /**
+   * Get available courses context for AI Teacher recommendations
+   * Returns a formatted string with courses the AI can recommend to the trainee
+   */
+  private async getCoursesContext(traineeId: string, isArabic: boolean): Promise<string> {
+    try {
+      // Get trainee's organizationId
+      const trainee = await this.prisma.trainee.findUnique({
+        where: { id: traineeId },
+        select: { organizationId: true },
+      });
+
+      if (!trainee?.organizationId) return '';
+
+      // Get published courses for this organization
+      const courses = await this.prisma.course.findMany({
+        where: {
+          organizationId: trainee.organizationId,
+          isPublished: true,
+        },
+        select: {
+          id: true,
+          titleAr: true,
+          titleEn: true,
+          descriptionAr: true,
+          descriptionEn: true,
+          category: true,
+          difficulty: true,
+          estimatedDurationMinutes: true,
+          objectivesAr: true,
+          objectivesEn: true,
+          lectures: {
+            orderBy: { orderInCourse: 'asc' },
+            select: {
+              id: true,
+              titleAr: true,
+              titleEn: true,
+              durationMinutes: true,
+            },
+          },
+        },
+        orderBy: [
+          { difficulty: 'asc' },
+          { createdAt: 'desc' },
+        ],
+      });
+
+      if (courses.length === 0) return '';
+
+      // Format courses for AI context
+      const coursesList = courses.map(course => {
+        const title = isArabic ? course.titleAr : course.titleEn;
+        const description = isArabic ? course.descriptionAr : course.descriptionEn;
+        const objectives = this.safeJsonParse(isArabic ? course.objectivesAr : course.objectivesEn, []);
+        const difficultyLabel = this.getDifficultyLabel(course.difficulty, isArabic);
+
+        const lectures = course.lectures.map(l => {
+          const lectureTitle = isArabic ? l.titleAr : l.titleEn;
+          return `  - ${lectureTitle} (${l.durationMinutes} ${isArabic ? 'دقيقة' : 'min'})`;
+        }).join('\n');
+
+        return isArabic
+          ? `### ${title}
+- **الرابط**: /courses/${course.id}
+- **المستوى**: ${difficultyLabel}
+- **المدة**: ${course.estimatedDurationMinutes} دقيقة
+- **الوصف**: ${description}
+- **الأهداف**: ${objectives.join('، ')}
+- **الدروس**:
+${lectures}`
+          : `### ${title}
+- **Link**: /courses/${course.id}
+- **Level**: ${difficultyLabel}
+- **Duration**: ${course.estimatedDurationMinutes} minutes
+- **Description**: ${description}
+- **Objectives**: ${objectives.join(', ')}
+- **Lessons**:
+${lectures}`;
+      }).join('\n\n');
+
+      return isArabic
+        ? `## الدورات التدريبية المتاحة
+يمكنك ترشيح هذه الدورات للمتدرب بناءً على مستواه واحتياجاته. استخدم الروابط المباشرة عند الترشيح.
+
+${coursesList}`
+        : `## Available Training Courses
+You can recommend these courses to the trainee based on their level and needs. Use the direct links when recommending.
+
+${coursesList}`;
+    } catch (error) {
+      console.error('[AITeacherService] getCoursesContext error:', error);
+      return '';
+    }
+  }
+
+  private safeJsonParse(json: string | null, defaultValue: any): any {
+    if (!json) return defaultValue;
+    try {
+      return JSON.parse(json);
+    } catch {
+      return defaultValue;
+    }
+  }
+
+  private getDifficultyLabel(difficulty: string, isArabic: boolean): string {
+    const labels: Record<string, { ar: string; en: string }> = {
+      beginner: { ar: 'مبتدئ', en: 'Beginner' },
+      intermediate: { ar: 'متوسط', en: 'Intermediate' },
+      advanced: { ar: 'متقدم', en: 'Advanced' },
+    };
+    return isArabic ? labels[difficulty]?.ar || difficulty : labels[difficulty]?.en || difficulty;
+  }
+
+  /**
    * Get user performance history context for Abdullah
    */
   private async getUserHistoryContext(traineeId: string): Promise<string> {
@@ -980,6 +1093,9 @@ ${lessonContext.videoDurationMinutes ? `- **Video Duration**: ${lessonContext.vi
 `;
     }
 
+    // Get available courses context for recommendations
+    const coursesContext = await this.getCoursesContext(traineeId, isArabic);
+
     // System prompt: use persona-specific if teacherName provided, else generic
     let systemPrompt: string;
     if (teacherName) {
@@ -989,11 +1105,19 @@ ${lessonContext.videoDurationMinutes ? `- **Video Duration**: ${lessonContext.vi
           traineeId, teacherName as TeacherPersonaName, profileMarkdown,
           lessonContextSection, attachmentContext, isArabic, message
         );
+        // Add courses context to persona prompt
+        if (coursesContext) {
+          systemPrompt += '\n\n' + coursesContext;
+        }
       } else {
         // Use custom teacher from database
         systemPrompt = await this.buildCustomTeacherSystemPrompt(
           teacherName, profileMarkdown, lessonContextSection, attachmentContext, isArabic
         );
+        // Add courses context to custom teacher prompt
+        if (coursesContext) {
+          systemPrompt += '\n\n' + coursesContext;
+        }
       }
     } else {
       systemPrompt = isArabic
@@ -1010,7 +1134,9 @@ ${lessonContextSection}
 4. ركز على التطبيق العملي في سوق العقارات السعودي
 5. شجع المتدرب وادعمه مع تقديم نقد بناء
 6. إذا طُلب منك موضوع خارج العقارات، وجه المحادثة بلطف للتركيز على التدريب
-${attachmentContext}`
+7. عند سؤالك عن الدورات المناسبة، رشح دورات بناءً على مستوى المتدرب ونقاط ضعفه مع إرفاق الروابط المباشرة
+${attachmentContext}
+${coursesContext}`
         : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.
 
 ## Trainee Profile (use this to personalize your responses):
@@ -1024,7 +1150,9 @@ ${lessonContextSection}
 4. Focus on practical application in the Saudi real estate market
 5. Provide constructive feedback while being supportive
 6. If asked about off-topic subjects, gently redirect to training focus
-${attachmentContext}`;
+7. When asked about suitable courses, recommend based on trainee's level and weaknesses with direct links
+${attachmentContext}
+${coursesContext}`;
     }
 
     // Generate response using Gemini 2.0 Flash for low-latency
@@ -1104,6 +1232,9 @@ ${attachmentContext}`;
         : `\n\n## Current Lesson Context:\n- **Lesson**: ${lessonContext.lessonName}\n- **Description**: ${lessonContext.lessonDescription}\n- **Course**: ${lessonContext.courseName}`;
     }
 
+    // Get available courses context for recommendations
+    const coursesContext = await this.getCoursesContext(traineeId, isArabic);
+
     // System prompt: use persona-specific if teacherName provided, else generic
     let systemPrompt: string;
     if (teacherName) {
@@ -1112,16 +1243,24 @@ ${attachmentContext}`;
           traineeId, teacherName as TeacherPersonaName, profileMarkdown,
           lessonContextSection, attachmentContext, isArabic, message
         );
+        // Add courses context to persona prompt
+        if (coursesContext) {
+          systemPrompt += '\n\n' + coursesContext;
+        }
       } else {
         // Custom teacher from database
         systemPrompt = await this.buildCustomTeacherSystemPrompt(
           teacherName, profileMarkdown, lessonContextSection, attachmentContext, isArabic
         );
+        // Add courses context to custom teacher prompt
+        if (coursesContext) {
+          systemPrompt += '\n\n' + coursesContext;
+        }
       }
     } else {
       systemPrompt = isArabic
-        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي${attachmentContext}`
-        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market${attachmentContext}`;
+        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي\n5. عند سؤالك عن الدورات المناسبة، رشح بناءً على مستوى المتدرب مع الروابط المباشرة${attachmentContext}\n\n${coursesContext}`
+        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market\n5. When asked about courses, recommend based on trainee level with direct links${attachmentContext}\n\n${coursesContext}`;
     }
 
     let fullMessage = '';

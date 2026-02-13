@@ -8,6 +8,7 @@ import {
   TraineeProgress,
   UpdateTraineeInput,
   DashboardStats,
+  AssignedTeacherInfo,
 } from '../interfaces/trainee.interface';
 
 @injectable()
@@ -355,6 +356,103 @@ export class TraineeService implements ITraineeService {
       recentSessions: recentSessions.slice(0, 10),
       weeklyActivity,
       currentCourse,
+    };
+  }
+
+  /**
+   * Get the current assigned AI teacher for the trainee with full details from database
+   * This is the source of truth - not cached localStorage data
+   */
+  async getAssignedTeacher(traineeId: string): Promise<AssignedTeacherInfo> {
+    const trainee = await this.prisma.trainee.findUnique({
+      where: { id: traineeId },
+      select: {
+        assignedTeacher: true,
+        assignedTeacherId: true,
+        currentSkillLevel: true,
+        assignedTeacherRecord: {
+          select: {
+            id: true,
+            name: true,
+            displayNameAr: true,
+            displayNameEn: true,
+            avatarUrl: true,
+            voiceId: true,
+          },
+        },
+      },
+    });
+
+    if (!trainee) {
+      throw new Error('Trainee not found');
+    }
+
+    // If trainee has a linked AITeacher record, use that (most accurate)
+    if (trainee.assignedTeacherRecord) {
+      return {
+        hasAssignedTeacher: true,
+        teacherName: trainee.assignedTeacherRecord.name,
+        teacherId: trainee.assignedTeacherRecord.id,
+        displayNameAr: trainee.assignedTeacherRecord.displayNameAr,
+        displayNameEn: trainee.assignedTeacherRecord.displayNameEn,
+        avatarUrl: trainee.assignedTeacherRecord.avatarUrl,
+        voiceId: trainee.assignedTeacherRecord.voiceId,
+        currentSkillLevel: trainee.currentSkillLevel,
+      };
+    }
+
+    // Fallback: if only assignedTeacher name is set (legacy), try to find matching AITeacher
+    if (trainee.assignedTeacher) {
+      const aiTeacher = await this.prisma.aITeacher.findFirst({
+        where: {
+          name: trainee.assignedTeacher.toLowerCase(),
+        },
+        select: {
+          id: true,
+          name: true,
+          displayNameAr: true,
+          displayNameEn: true,
+          avatarUrl: true,
+          voiceId: true,
+        },
+      });
+
+      if (aiTeacher) {
+        return {
+          hasAssignedTeacher: true,
+          teacherName: aiTeacher.name,
+          teacherId: aiTeacher.id,
+          displayNameAr: aiTeacher.displayNameAr,
+          displayNameEn: aiTeacher.displayNameEn,
+          avatarUrl: aiTeacher.avatarUrl,
+          voiceId: aiTeacher.voiceId,
+          currentSkillLevel: trainee.currentSkillLevel,
+        };
+      }
+
+      // Teacher name exists but no AITeacher record found
+      return {
+        hasAssignedTeacher: true,
+        teacherName: trainee.assignedTeacher,
+        teacherId: null,
+        displayNameAr: null,
+        displayNameEn: null,
+        avatarUrl: null,
+        voiceId: null,
+        currentSkillLevel: trainee.currentSkillLevel,
+      };
+    }
+
+    // No assigned teacher
+    return {
+      hasAssignedTeacher: false,
+      teacherName: null,
+      teacherId: null,
+      displayNameAr: null,
+      displayNameEn: null,
+      avatarUrl: null,
+      voiceId: null,
+      currentSkillLevel: trainee.currentSkillLevel,
     };
   }
 

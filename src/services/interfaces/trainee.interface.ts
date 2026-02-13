@@ -81,11 +81,23 @@ export interface DashboardStats {
   } | null;
 }
 
+export interface AssignedTeacherInfo {
+  hasAssignedTeacher: boolean;
+  teacherName: string | null;
+  teacherId: string | null;
+  displayNameAr: string | null;
+  displayNameEn: string | null;
+  avatarUrl: string | null;
+  voiceId: string | null;
+  currentSkillLevel: string | null;
+}
+
 export interface ITraineeService {
   getProfile(traineeId: string): Promise<TraineeProfile>;
   updateProfile(traineeId: string, input: UpdateTraineeInput): Promise<TraineeProfile>;
   getProgress(traineeId: string, programId: string): Promise<TraineeProgress>;
   getDashboardStats(traineeId: string): Promise<DashboardStats>;
+  getAssignedTeacher(traineeId: string): Promise<AssignedTeacherInfo>;
   updateActivity(traineeId: string, timeSpentMinutes: number): Promise<void>;
   enrollInProgram(traineeId: string, programId: string): Promise<void>;
   completeLecture(traineeId: string, lectureId: string, timeSpentMinutes: number): Promise<void>;

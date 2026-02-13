@@ -76,6 +76,13 @@ export class TraineeController {
       this.updateActivity.bind(this)
     );
 
+    // Get current assigned AI teacher with full details
+    this.router.get(
+      '/me/assigned-teacher',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.getAssignedTeacher.bind(this)
+    );
+
     // Admin routes
     this.router.get(
       '/:traineeId',
@@ -197,6 +204,26 @@ export class TraineeController {
       const profile = await this.traineeService.getProfile(traineeId);
 
       res.status(200).json(profile);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
+   * Get the current assigned AI teacher for the trainee with full details
+   * Returns teacher info directly from the database (not cached localStorage)
+   */
+  private async getAssignedTeacher(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+
+      const teacherInfo = await this.traineeService.getAssignedTeacher(traineeId);
+
+      res.status(200).json(teacherInfo);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
         res.status(404).json({ error: error.message });

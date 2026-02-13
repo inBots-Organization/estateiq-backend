@@ -49,8 +49,8 @@ export class CourseService implements ICourseService {
 
     return {
       id: course.id,
-      programId: course.programId,
-      levelId: course.levelId,
+      programId: course.programId || '',
+      levelId: course.levelId || '',
       title: course.title,
       description: course.description,
       objectives: this.parseJsonArray(course.objectives),

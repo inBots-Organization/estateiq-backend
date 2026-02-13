@@ -55,44 +55,109 @@ model Trainee {
 
 model Course {
   id                       String    @id @default(uuid())
-  programId                String    @map("program_id")
-  levelId                  String    @map("level_id")
+  organizationId           String?   @map("organization_id")
+  programId                String?   @map("program_id")
+  levelId                  String?   @map("level_id")
+
+  // Bilingual fields (default from legacy title/description for migration)
+  titleAr                  String    @default("") @map("title_ar")
+  titleEn                  String    @default("") @map("title_en")
+  descriptionAr            String    @default("") @map("description_ar") @db.Text
+  descriptionEn            String    @default("") @map("description_en") @db.Text
+  objectivesAr             String    @default("[]") @map("objectives_ar")
+  objectivesEn             String    @default("[]") @map("objectives_en")
+
+  // Legacy fields (for backward compatibility)
   title                    String
   description              String
   objectives               String    @default("[]")
   prerequisites            String    @default("[]")
+
   estimatedDurationMinutes Int       @map("estimated_duration_minutes")
   difficulty               String
   category                 String
   competencyTags           String[]  @default([]) @map("competency_tags")
+
+  // Media & presentation
+  thumbnailUrl             String?   @map("thumbnail_url")
+  notesAr                  String?   @map("notes_ar") @db.Text
+  notesEn                  String?   @map("notes_en") @db.Text
+
+  // Recommended simulation settings
+  recommendedSimulationType      String?   @map("recommended_simulation_type")
+  recommendedSimulationScenario  String?   @map("recommended_simulation_scenario")
+  recommendedSimulationDifficulty String?  @map("recommended_simulation_difficulty")
+
   isPublished              Boolean   @default(false) @map("is_published")
-  orderInLevel             Int       @map("order_in_level")
+  orderInLevel             Int       @default(0) @map("order_in_level")
+  createdById              String?   @map("created_by_id")
+
   createdAt                DateTime  @default(now()) @map("created_at")
   updatedAt                DateTime  @updatedAt @map("updated_at")
-  level                    Level     @relation(fields: [levelId], references: [id])
-  program                  Program   @relation(fields: [programId], references: [id])
+
+  organization             Organization? @relation(fields: [organizationId], references: [id])
+  level                    Level?    @relation(fields: [levelId], references: [id])
+  program                  Program?  @relation(fields: [programId], references: [id])
   lectures                 Lecture[]
   quizzes                  Quiz[]
   flashcardDecks           FlashcardDeck[]
+  attachments              CourseAttachment[]
 
+  @@index([organizationId])
+  @@index([organizationId, isPublished])
   @@map("courses")
 }
 
 model Lecture {
   id                          String              @id @default(uuid())
   courseId                    String              @map("course_id")
+
+  // Bilingual fields (default from legacy title/description for migration)
+  titleAr                     String              @default("") @map("title_ar")
+  titleEn                     String              @default("") @map("title_en")
+  descriptionAr               String              @default("") @map("description_ar") @db.Text
+  descriptionEn               String              @default("") @map("description_en") @db.Text
+
+  // Legacy fields (for backward compatibility)
   title                       String
   description                 String
+
   videoUrl                    String              @map("video_url")
+  videoType                   String              @default("youtube") @map("video_type") // youtube, vimeo, direct
   durationMinutes             Int                 @map("duration_minutes")
   orderInCourse               Int                 @map("order_in_course")
   triggerAssessmentOnComplete Boolean             @default(true) @map("trigger_assessment_on_complete")
   createdAt                   DateTime            @default(now()) @map("created_at")
   updatedAt                   DateTime            @updatedAt @map("updated_at")
   completions                 LectureCompletion[]
-  course                      Course              @relation(fields: [courseId], references: [id])
+  course                      Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
+  @@index([courseId])
   @@map("lectures")
+}
+
+// Course attachments (PDFs, documents, etc.)
+model CourseAttachment {
+  id              String    @id @default(uuid())
+  courseId        String    @map("course_id")
+
+  titleAr         String?   @map("title_ar")
+  titleEn         String?   @map("title_en")
+  fileName        String    @map("file_name")
+  fileType        String    @map("file_type")   // pdf, image, document
+  fileSize        Int       @map("file_size")
+  fileUrl         String    @map("file_url")    // GCS URL
+
+  displayOrder    Int       @default(0) @map("display_order")
+  isDownloadable  Boolean   @default(true) @map("is_downloadable")
+
+  uploadedById    String?   @map("uploaded_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  course          Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("course_attachments")
 }
 
 model SimulationSession {
@@ -171,6 +236,7 @@ model Organization {
   subscription     Subscription?
   apiUsage         ApiUsage[]
   aiTeachers       AITeacher[]
+  courses          Course[]
 
   @@map("organizations")
 }

@@ -310,6 +310,128 @@ export class SuperAdminService implements ISuperAdminService {
     });
   }
 
+  async deleteOrganization(orgId: string): Promise<{ success: boolean; message: string; deletedCounts: Record<string, number> }> {
+    // Check if organization exists
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      include: {
+        trainees: { select: { id: true } },
+      },
+    });
+
+    if (!org) {
+      throw new Error('Organization not found');
+    }
+
+    // Don't allow deleting platform organization
+    if (org.name === '__platform__') {
+      throw new Error('Cannot delete platform organization');
+    }
+
+    const traineeIds = org.trainees.map((t) => t.id);
+    const deletedCounts: Record<string, number> = {};
+
+    // Delete in correct order to handle foreign key constraints
+    // Use transaction for atomic deletion
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete chat messages
+      const chatMessages = await tx.chatMessage.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.chatMessages = chatMessages.count;
+
+      // 2. Delete simulation messages
+      const simMessages = await tx.simulationMessage.deleteMany({
+        where: { session: { traineeId: { in: traineeIds } } },
+      });
+      deletedCounts.simulationMessages = simMessages.count;
+
+      // 3. Delete simulation sessions
+      const simSessions = await tx.simulationSession.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.simulationSessions = simSessions.count;
+
+      // 4. Delete voice sessions
+      const voiceSessions = await tx.voiceSession.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.voiceSessions = voiceSessions.count;
+
+      // 5. Delete trainee AI teacher assignments
+      const teacherAssignments = await tx.trainee.updateMany({
+        where: { id: { in: traineeIds } },
+        data: { assignedTeacherId: null },
+      });
+
+      // 6. Delete AI teacher documents
+      const teacherDocs = await tx.aITeacherDocument.deleteMany({
+        where: { teacher: { organizationId: orgId } },
+      });
+      deletedCounts.aiTeacherDocuments = teacherDocs.count;
+
+      // 7. Delete AI teachers
+      const teachers = await tx.aITeacher.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.aiTeachers = teachers.count;
+
+      // 8. Delete group memberships
+      const groupMemberships = await tx.groupMembership.deleteMany({
+        where: { trainee: { organizationId: orgId } },
+      });
+      deletedCounts.groupMemberships = groupMemberships.count;
+
+      // 9. Delete groups
+      const groups = await tx.group.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.groups = groups.count;
+
+      // 10. Delete API usage records
+      const apiUsage = await tx.apiUsage.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.apiUsage = apiUsage.count;
+
+      // 11. Delete subscription
+      const subscription = await tx.subscription.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.subscriptions = subscription.count;
+
+      // 12. Delete brain document chunks
+      const brainChunks = await tx.brainDocumentChunk.deleteMany({
+        where: { document: { organizationId: orgId } },
+      });
+      deletedCounts.brainChunks = brainChunks.count;
+
+      // 13. Delete brain documents
+      const brainDocs = await tx.brainDocument.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.brainDocuments = brainDocs.count;
+
+      // 14. Delete trainees (users)
+      const trainees = await tx.trainee.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.users = trainees.count;
+
+      // 15. Finally, delete the organization
+      await tx.organization.delete({
+        where: { id: orgId },
+      });
+      deletedCounts.organizations = 1;
+    });
+
+    return {
+      success: true,
+      message: `Organization "${org.name}" and all its data have been permanently deleted`,
+      deletedCounts,
+    };
+  }
+
   // ==========================================
   // Subscription Management
   // ==========================================

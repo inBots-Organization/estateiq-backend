@@ -102,6 +102,25 @@ router.patch('/organizations/:id/status', async (req: Request, res: Response, ne
   }
 });
 
+// Delete organization permanently with all its data
+router.delete('/organizations/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const result = await superAdminService.deleteOrganization(id);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Organization not found') {
+      res.status(404).json({ error: 'Organization not found' });
+      return;
+    }
+    if (error instanceof Error && error.message.includes('Cannot delete')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
 router.post('/organizations/:id/impersonate', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;

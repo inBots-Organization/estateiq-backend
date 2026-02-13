@@ -574,13 +574,25 @@ ${lectures}`;
 
       return isArabic
         ? `## الدورات التدريبية المتاحة
-عند ترشيح دورة للمتدرب، يجب أن تقدم الرابط كاملاً وجاهزاً للنسخ بهذا الشكل: ${baseUrl}/courses/[id]
-لا تقطع الرابط أو تختصره - اكتبه كاملاً في سطر منفصل.
+عند ترشيح دورة للمتدرب:
+1. اذكر اسم الدورة ووصفها بشكل مختصر
+2. في نهاية الرد، اكتب الرابط الكامل بهذا الشكل بالضبط:
+
+🔗 رابط الدورة:
+${baseUrl}/courses/COURSE_ID
+
+استبدل COURSE_ID بمعرف الدورة الفعلي. الرابط يجب أن يكون في سطر منفصل وكامل بدون اختصار.
 
 ${coursesList}`
         : `## Available Training Courses
-When recommending a course, provide the full link ready to copy like this: ${baseUrl}/courses/[id]
-Do not truncate or abbreviate the link - write it in full on a separate line.
+When recommending a course:
+1. Mention the course name and brief description
+2. At the end of your response, write the full link exactly like this:
+
+🔗 Course Link:
+${baseUrl}/courses/COURSE_ID
+
+Replace COURSE_ID with the actual course ID. The link must be on a separate line and complete without abbreviation.
 
 ${coursesList}`;
     } catch (error) {

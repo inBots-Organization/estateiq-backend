@@ -537,12 +537,16 @@ ${sessionNotesSection}
 
       if (courses.length === 0) return '';
 
+      // Base URL for course links
+      const baseUrl = process.env.FRONTEND_URL || 'https://inlearn.macsoft.ai';
+
       // Format courses for AI context
       const coursesList = courses.map(course => {
         const title = isArabic ? course.titleAr : course.titleEn;
         const description = isArabic ? course.descriptionAr : course.descriptionEn;
         const objectives = this.safeJsonParse(isArabic ? course.objectivesAr : course.objectivesEn, []);
         const difficultyLabel = this.getDifficultyLabel(course.difficulty, isArabic);
+        const courseUrl = `${baseUrl}/courses/${course.id}`;
 
         const lectures = course.lectures.map(l => {
           const lectureTitle = isArabic ? l.titleAr : l.titleEn;
@@ -551,30 +555,32 @@ ${sessionNotesSection}
 
         return isArabic
           ? `### ${title}
-- **الرابط**: /courses/${course.id}
-- **المستوى**: ${difficultyLabel}
-- **المدة**: ${course.estimatedDurationMinutes} دقيقة
-- **الوصف**: ${description}
-- **الأهداف**: ${objectives.join('، ')}
-- **الدروس**:
+- الرابط: ${courseUrl}
+- المستوى: ${difficultyLabel}
+- المدة: ${course.estimatedDurationMinutes} دقيقة
+- الوصف: ${description}
+- الأهداف: ${objectives.join('، ')}
+- الدروس:
 ${lectures}`
           : `### ${title}
-- **Link**: /courses/${course.id}
-- **Level**: ${difficultyLabel}
-- **Duration**: ${course.estimatedDurationMinutes} minutes
-- **Description**: ${description}
-- **Objectives**: ${objectives.join(', ')}
-- **Lessons**:
+- Link: ${courseUrl}
+- Level: ${difficultyLabel}
+- Duration: ${course.estimatedDurationMinutes} minutes
+- Description: ${description}
+- Objectives: ${objectives.join(', ')}
+- Lessons:
 ${lectures}`;
       }).join('\n\n');
 
       return isArabic
         ? `## الدورات التدريبية المتاحة
-يمكنك ترشيح هذه الدورات للمتدرب بناءً على مستواه واحتياجاته. استخدم الروابط المباشرة عند الترشيح.
+عند ترشيح دورة للمتدرب، يجب أن تقدم الرابط كاملاً وجاهزاً للنسخ بهذا الشكل: ${baseUrl}/courses/[id]
+لا تقطع الرابط أو تختصره - اكتبه كاملاً في سطر منفصل.
 
 ${coursesList}`
         : `## Available Training Courses
-You can recommend these courses to the trainee based on their level and needs. Use the direct links when recommending.
+When recommending a course, provide the full link ready to copy like this: ${baseUrl}/courses/[id]
+Do not truncate or abbreviate the link - write it in full on a separate line.
 
 ${coursesList}`;
     } catch (error) {
@@ -1135,6 +1141,12 @@ ${lessonContextSection}
 5. شجع المتدرب وادعمه مع تقديم نقد بناء
 6. إذا طُلب منك موضوع خارج العقارات، وجه المحادثة بلطف للتركيز على التدريب
 7. عند سؤالك عن الدورات المناسبة، رشح دورات بناءً على مستوى المتدرب ونقاط ضعفه مع إرفاق الروابط المباشرة
+
+## تنسيق الرد:
+- اكتب بلغة واضحة بدون علامات ** أو رموز markdown
+- عند ذكر رابط، اكتبه كاملاً في سطر منفصل ليسهل نسخه
+- لا تستخدم أقواس مربعة [] أو رموز غريبة
+- استخدم النقاط العادية للقوائم
 ${attachmentContext}
 ${coursesContext}`
         : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.
@@ -1151,6 +1163,12 @@ ${lessonContextSection}
 5. Provide constructive feedback while being supportive
 6. If asked about off-topic subjects, gently redirect to training focus
 7. When asked about suitable courses, recommend based on trainee's level and weaknesses with direct links
+
+## Response Formatting:
+- Write in clear language without ** or markdown symbols
+- When mentioning a link, write it fully on a separate line for easy copying
+- Don't use square brackets [] or strange symbols
+- Use regular bullets for lists
 ${attachmentContext}
 ${coursesContext}`;
     }
@@ -1259,8 +1277,8 @@ ${coursesContext}`;
       }
     } else {
       systemPrompt = isArabic
-        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي\n5. عند سؤالك عن الدورات المناسبة، رشح بناءً على مستوى المتدرب مع الروابط المباشرة${attachmentContext}\n\n${coursesContext}`
-        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market\n5. When asked about courses, recommend based on trainee level with direct links${attachmentContext}\n\n${coursesContext}`;
+        ? `أنت "المعلم الذكي" - معلم ذكاء اصطناعي متخصص في تدريب وكلاء العقارات السعوديين.\n\n## ملف المتدرب:\n${profileMarkdown}${lessonContextSection}\n\n## قواعدك:\n1. تحدث باللهجة السعودية الودية والمهنية\n2. خصص ردودك بناءً على نقاط قوة وضعف المتدرب\n3. لا تكتفِ بالإجابة - اطرح أسئلة لاختبار الفهم\n4. ركز على التطبيق العملي في سوق العقارات السعودي\n5. عند سؤالك عن الدورات المناسبة، رشح بناءً على مستوى المتدرب مع الروابط المباشرة\n\n## تنسيق الرد:\n- اكتب بلغة واضحة بدون علامات ** أو رموز markdown\n- عند ذكر رابط، اكتبه كاملاً في سطر منفصل ليسهل نسخه\n- لا تستخدم أقواس مربعة [] أو رموز غريبة${attachmentContext}\n\n${coursesContext}`
+        : `You are "AI Teacher" - an AI mentor specializing in training Saudi real estate agents.\n\n## Trainee Profile:\n${profileMarkdown}${lessonContextSection}\n\n## Your Rules:\n1. Be warm, professional, and encouraging\n2. Personalize responses based on trainee's strengths and weaknesses\n3. Don't just answer - ask questions to test comprehension\n4. Focus on practical application in the Saudi real estate market\n5. When asked about courses, recommend based on trainee level with direct links\n\n## Response Formatting:\n- Write in clear language without ** or markdown symbols\n- When mentioning a link, write it fully on a separate line for easy copying\n- Don't use square brackets [] or strange symbols${attachmentContext}\n\n${coursesContext}`;
     }
 
     let fullMessage = '';

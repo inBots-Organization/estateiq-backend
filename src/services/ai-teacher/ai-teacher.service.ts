@@ -491,18 +491,26 @@ ${sessionNotesSection}
   /**
    * Get available courses context for AI Teacher recommendations
    * Returns a formatted string with courses the AI can recommend to the trainee
+   * Includes detailed lesson info and attachments for precise answers
    */
   private async getCoursesContext(traineeId: string, isArabic: boolean): Promise<string> {
     try {
-      // Get trainee's organizationId
+      // Get trainee's organizationId and completed lectures
       const trainee = await this.prisma.trainee.findUnique({
         where: { id: traineeId },
-        select: { organizationId: true },
+        select: {
+          organizationId: true,
+          lectureCompletions: {
+            select: { lectureId: true, completedAt: true }
+          }
+        },
       });
 
       if (!trainee?.organizationId) return '';
 
-      // Get published courses for this organization
+      const completedLectureIds = new Set(trainee.lectureCompletions.map(lc => lc.lectureId));
+
+      // Get published courses for this organization with full details
       const courses = await this.prisma.course.findMany({
         where: {
           organizationId: trainee.organizationId,
@@ -519,14 +527,29 @@ ${sessionNotesSection}
           estimatedDurationMinutes: true,
           objectivesAr: true,
           objectivesEn: true,
+          notesAr: true,
+          notesEn: true,
           lectures: {
             orderBy: { orderInCourse: 'asc' },
             select: {
               id: true,
               titleAr: true,
               titleEn: true,
+              descriptionAr: true,
+              descriptionEn: true,
               durationMinutes: true,
+              orderInCourse: true,
             },
+          },
+          attachments: {
+            select: {
+              id: true,
+              titleAr: true,
+              titleEn: true,
+              fileName: true,
+              fileType: true,
+            },
+            orderBy: { displayOrder: 'asc' },
           },
         },
         orderBy: [
@@ -540,59 +563,100 @@ ${sessionNotesSection}
       // Base URL for course links
       const baseUrl = process.env.FRONTEND_URL || 'https://inlearn.macsoft.ai';
 
-      // Format courses for AI context
+      // Format courses for AI context with full details
       const coursesList = courses.map(course => {
         const title = isArabic ? course.titleAr : course.titleEn;
         const description = isArabic ? course.descriptionAr : course.descriptionEn;
         const objectives = this.safeJsonParse(isArabic ? course.objectivesAr : course.objectivesEn, []);
         const difficultyLabel = this.getDifficultyLabel(course.difficulty, isArabic);
         const courseUrl = `${baseUrl}/courses/${course.id}`;
+        const notes = isArabic ? course.notesAr : course.notesEn;
 
-        const lectures = course.lectures.map(l => {
+        // Format lessons with full details and completion status
+        const lectures = course.lectures.map((l, idx) => {
           const lectureTitle = isArabic ? l.titleAr : l.titleEn;
-          return `  - ${lectureTitle} (${l.durationMinutes} ${isArabic ? 'دقيقة' : 'min'})`;
+          const lectureDesc = isArabic ? l.descriptionAr : l.descriptionEn;
+          const isCompleted = completedLectureIds.has(l.id);
+          const status = isCompleted ? (isArabic ? '✅ مكتمل' : '✅ Completed') : (isArabic ? '⏳ لم يكتمل' : '⏳ Not completed');
+          const lectureUrl = `${baseUrl}/courses/${course.id}?lesson=${l.id}`;
+
+          return isArabic
+            ? `  ${idx + 1}. ${lectureTitle} (${l.durationMinutes} دقيقة) - ${status}
+     الوصف: ${lectureDesc || 'غير متوفر'}
+     الرابط: ${lectureUrl}`
+            : `  ${idx + 1}. ${lectureTitle} (${l.durationMinutes} min) - ${status}
+     Description: ${lectureDesc || 'Not available'}
+     Link: ${lectureUrl}`;
         }).join('\n');
+
+        // Format attachments
+        let attachmentsSection = '';
+        if (course.attachments && course.attachments.length > 0) {
+          const attachmentsList = course.attachments.map(a => {
+            const attachTitle = isArabic ? (a.titleAr || a.fileName) : (a.titleEn || a.fileName);
+            return `  - ${attachTitle} (${a.fileType})`;
+          }).join('\n');
+          attachmentsSection = isArabic
+            ? `\n- المرفقات والملفات:\n${attachmentsList}`
+            : `\n- Attachments:\n${attachmentsList}`;
+        }
+
+        // Calculate completion progress
+        const completedCount = course.lectures.filter(l => completedLectureIds.has(l.id)).length;
+        const totalCount = course.lectures.length;
+        const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const progressText = isArabic
+          ? `${completedCount}/${totalCount} دروس مكتملة (${progressPercent}%)`
+          : `${completedCount}/${totalCount} lessons completed (${progressPercent}%)`;
 
         return isArabic
           ? `### ${title}
-- الرابط: ${courseUrl}
+- معرف الدورة: ${course.id}
+- الرابط الكامل: ${courseUrl}
 - المستوى: ${difficultyLabel}
-- المدة: ${course.estimatedDurationMinutes} دقيقة
+- المدة الإجمالية: ${course.estimatedDurationMinutes} دقيقة
+- تقدم المتدرب: ${progressText}
 - الوصف: ${description}
-- الأهداف: ${objectives.join('، ')}
-- الدروس:
+- الأهداف: ${objectives.join('، ')}${notes ? `\n- ملاحظات المدرب: ${notes}` : ''}${attachmentsSection}
+- الدروس التفصيلية:
 ${lectures}`
           : `### ${title}
-- Link: ${courseUrl}
+- Course ID: ${course.id}
+- Full Link: ${courseUrl}
 - Level: ${difficultyLabel}
-- Duration: ${course.estimatedDurationMinutes} minutes
+- Total Duration: ${course.estimatedDurationMinutes} minutes
+- Trainee Progress: ${progressText}
 - Description: ${description}
-- Objectives: ${objectives.join(', ')}
-- Lessons:
+- Objectives: ${objectives.join(', ')}${notes ? `\n- Trainer Notes: ${notes}` : ''}${attachmentsSection}
+- Detailed Lessons:
 ${lectures}`;
       }).join('\n\n');
 
       return isArabic
-        ? `## الدورات التدريبية المتاحة
-عند ترشيح دورة للمتدرب:
-1. اذكر اسم الدورة ووصفها بشكل مختصر
-2. في نهاية الرد، اكتب الرابط الكامل بهذا الشكل بالضبط:
+        ? `## الدورات التدريبية المتاحة (بيانات كاملة)
 
-🔗 رابط الدورة:
-${baseUrl}/courses/COURSE_ID
+أنت تملك معلومات تفصيلية عن كل دورة ودروسها. عند سؤالك:
+- عن درس معين: اذكر اسمه ووصفه ورابطه المباشر
+- عن دورة: اذكر تفاصيلها وتقدم المتدرب فيها
+- عن محتوى: استخدم أوصاف الدروس للإجابة بدقة
 
-استبدل COURSE_ID بمعرف الدورة الفعلي. الرابط يجب أن يكون في سطر منفصل وكامل بدون اختصار.
+قواعد عرض الروابط:
+- اكتب الرابط كاملاً في سطر منفصل
+- لا تقطع أو تختصر الروابط
+- استخدم رابط الدرس المباشر إذا سأل عن درس محدد
 
 ${coursesList}`
-        : `## Available Training Courses
-When recommending a course:
-1. Mention the course name and brief description
-2. At the end of your response, write the full link exactly like this:
+        : `## Available Training Courses (Full Data)
 
-🔗 Course Link:
-${baseUrl}/courses/COURSE_ID
+You have detailed information about each course and its lessons. When asked:
+- About a specific lesson: mention its name, description, and direct link
+- About a course: provide its details and the trainee's progress
+- About content: use lesson descriptions to answer precisely
 
-Replace COURSE_ID with the actual course ID. The link must be on a separate line and complete without abbreviation.
+Link display rules:
+- Write the full link on a separate line
+- Do not truncate or abbreviate links
+- Use the direct lesson link if asked about a specific lesson
 
 ${coursesList}`;
     } catch (error) {
@@ -620,23 +684,88 @@ ${coursesList}`;
   }
 
   /**
-   * Get user performance history context for Abdullah
+   * Get comprehensive user performance history context
+   * Includes course progress, simulations, voice sessions, quizzes, and diagnostics
    */
   private async getUserHistoryContext(traineeId: string): Promise<string> {
     try {
       const sections: string[] = [];
 
-      // Last 10 simulation sessions
+      // Get trainee with organization
+      const trainee = await this.prisma.trainee.findUnique({
+        where: { id: traineeId },
+        select: {
+          firstName: true,
+          lastName: true,
+          currentStreak: true,
+          lastActiveAt: true,
+          organizationId: true,
+        },
+      });
+
+      // Course Progress - Most important for learning
+      const lectureCompletions = await this.prisma.lectureCompletion.findMany({
+        where: { traineeId },
+        include: {
+          lecture: {
+            include: {
+              course: {
+                select: { id: true, titleAr: true, titleEn: true, difficulty: true }
+              }
+            }
+          }
+        },
+        orderBy: { completedAt: 'desc' },
+        take: 20,
+      });
+
+      if (lectureCompletions.length > 0) {
+        // Group by course
+        const courseProgress: Record<string, { title: string; completed: string[]; lastDate: Date }> = {};
+        for (const lc of lectureCompletions) {
+          const courseId = lc.lecture.courseId;
+          const courseTitle = lc.lecture.course?.titleAr || lc.lecture.course?.titleEn || 'Unknown';
+          if (!courseProgress[courseId]) {
+            courseProgress[courseId] = { title: courseTitle, completed: [], lastDate: lc.completedAt };
+          }
+          courseProgress[courseId].completed.push(lc.lecture.titleAr || lc.lecture.titleEn || lc.lecture.title);
+          if (lc.completedAt > courseProgress[courseId].lastDate) {
+            courseProgress[courseId].lastDate = lc.completedAt;
+          }
+        }
+
+        const courseProgressText = Object.entries(courseProgress).map(([_, data]) => {
+          return `- ${data.title}: أكمل ${data.completed.length} دروس (آخر نشاط: ${data.lastDate.toLocaleDateString('ar-SA')})
+  الدروس المكتملة: ${data.completed.slice(0, 5).join('، ')}${data.completed.length > 5 ? '...' : ''}`;
+        }).join('\n');
+
+        sections.push(`## تقدم المتدرب في الدورات:\n${courseProgressText}`);
+      }
+
+      // Last 10 simulation sessions with more details
       const simSessions = await this.prisma.simulationSession.findMany({
         where: { traineeId },
         orderBy: { createdAt: 'desc' },
         take: 10,
-        select: { id: true, scenarioType: true, status: true, outcome: true, createdAt: true },
+        select: {
+          scenarioType: true,
+          difficultyLevel: true,
+          status: true,
+          outcome: true,
+          createdAt: true,
+          evaluations: {
+            select: { category: true, score: true }
+          }
+        },
       });
       if (simSessions.length > 0) {
-        sections.push('## Simulation Sessions:\n' + simSessions.map(
-          (s) => `- ${s.scenarioType} | Status: ${s.status} | Outcome: ${s.outcome ?? 'N/A'} | ${s.createdAt.toLocaleDateString()}`
-        ).join('\n'));
+        const simText = simSessions.map(s => {
+          const avgScore = s.evaluations.length > 0
+            ? Math.round(s.evaluations.reduce((sum, e) => sum + e.score, 0) / s.evaluations.length)
+            : null;
+          return `- ${s.scenarioType} (${s.difficultyLevel}) | النتيجة: ${s.outcome ?? 'لم تكتمل'} | المعدل: ${avgScore ?? 'N/A'}% | ${s.createdAt.toLocaleDateString('ar-SA')}`;
+        }).join('\n');
+        sections.push(`## جلسات المحاكاة النصية:\n${simText}`);
       }
 
       // Last 5 voice sessions
@@ -644,44 +773,71 @@ ${coursesList}`;
         where: { traineeId },
         orderBy: { createdAt: 'desc' },
         take: 5,
-        select: { id: true, overallScore: true, durationSeconds: true, createdAt: true },
+        select: { overallScore: true, durationSeconds: true, createdAt: true },
       });
       if (voiceSessions.length > 0) {
-        sections.push('## Voice Sessions:\n' + voiceSessions.map(
-          (v) => `- Score: ${v.overallScore ?? 'N/A'}% | Duration: ${v.durationSeconds}s | ${v.createdAt.toLocaleDateString()}`
-        ).join('\n'));
+        const voiceText = voiceSessions.map(v =>
+          `- النتيجة: ${v.overallScore ?? 'N/A'}% | المدة: ${Math.round(v.durationSeconds / 60)} دقيقة | ${v.createdAt.toLocaleDateString('ar-SA')}`
+        ).join('\n');
+        sections.push(`## جلسات التدريب الصوتي:\n${voiceText}`);
       }
 
-      // Last 3 diagnostic daily reports
-      const dailyReports = await this.prisma.dailySkillReport.findMany({
+      // Latest diagnostic report with skill breakdown
+      const latestDiagnostic = await this.prisma.dailySkillReport.findFirst({
         where: { traineeId },
         orderBy: { date: 'desc' },
-        take: 3,
-        select: { date: true, overallScore: true, level: true, skillScores: true },
+        select: { date: true, overallScore: true, level: true, skillScores: true, strengths: true, weaknesses: true },
       });
-      if (dailyReports.length > 0) {
-        sections.push('## Diagnostic Reports:\n' + dailyReports.map(
-          (r) => `- ${r.date.toLocaleDateString()} | Overall: ${r.overallScore}% | Level: ${r.level}`
-        ).join('\n'));
+      if (latestDiagnostic) {
+        const skills = this.safeJsonParse(latestDiagnostic.skillScores as string, {});
+        const strengths = this.safeJsonParse(latestDiagnostic.strengths as string, []);
+        const weaknesses = this.safeJsonParse(latestDiagnostic.weaknesses as string, []);
+
+        let diagText = `- التاريخ: ${latestDiagnostic.date.toLocaleDateString('ar-SA')}
+- المستوى العام: ${latestDiagnostic.level} (${latestDiagnostic.overallScore}%)`;
+
+        if (Object.keys(skills).length > 0) {
+          diagText += '\n- تفاصيل المهارات:';
+          for (const [skill, score] of Object.entries(skills)) {
+            diagText += `\n  • ${skill}: ${score}%`;
+          }
+        }
+        if (strengths.length > 0) {
+          diagText += `\n- نقاط القوة: ${strengths.join('، ')}`;
+        }
+        if (weaknesses.length > 0) {
+          diagText += `\n- نقاط الضعف: ${weaknesses.join('، ')}`;
+        }
+
+        sections.push(`## آخر تقرير تشخيصي:\n${diagText}`);
       }
 
-      // Last 10 quiz attempts
+      // Quiz attempts
       const quizAttempts = await this.prisma.quizAttempt.findMany({
         where: { traineeId },
         orderBy: { startedAt: 'desc' },
-        take: 10,
+        take: 5,
         select: { score: true, totalPoints: true, earnedPoints: true, passed: true, startedAt: true },
       });
       if (quizAttempts.length > 0) {
-        sections.push('## Quiz Attempts:\n' + quizAttempts.map(
-          (q) => `- Score: ${q.score ?? 'N/A'}% | Points: ${q.earnedPoints ?? 0}/${q.totalPoints ?? 0} | Passed: ${q.passed ? 'Yes' : 'No'} | ${q.startedAt.toLocaleDateString()}`
-        ).join('\n'));
+        const quizText = quizAttempts.map(q =>
+          `- النتيجة: ${q.score ?? 'N/A'}% | النقاط: ${q.earnedPoints ?? 0}/${q.totalPoints ?? 0} | ${q.passed ? 'ناجح ✅' : 'راسب ❌'} | ${q.startedAt.toLocaleDateString('ar-SA')}`
+        ).join('\n');
+        sections.push(`## الاختبارات:\n${quizText}`);
       }
 
-      return sections.length > 0 ? sections.join('\n\n') : 'No training history available yet.';
+      // Summary stats
+      if (trainee) {
+        sections.unshift(`## ملخص المتدرب:
+- الاسم: ${trainee.firstName} ${trainee.lastName}
+- سلسلة الأيام المتتالية: ${trainee.currentStreak || 0} يوم
+- آخر نشاط: ${trainee.lastActiveAt?.toLocaleDateString('ar-SA') || 'غير معروف'}`);
+      }
+
+      return sections.length > 0 ? sections.join('\n\n') : 'لا يوجد سجل تدريب بعد. هذا المتدرب جديد.';
     } catch (error) {
       console.error('[AITeacherService] getUserHistoryContext error:', error);
-      return 'Performance history temporarily unavailable.';
+      return 'سجل الأداء غير متاح مؤقتاً.';
     }
   }
 

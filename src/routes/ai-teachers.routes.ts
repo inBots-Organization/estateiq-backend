@@ -387,10 +387,14 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
 
-    // If no teachers exist, seed default teachers
-    if (teachers.length === 0) {
+    // Auto-seed missing default teachers (not just when empty)
+    const existingNames = new Set(teachers.map(t => t.name));
+    const missingDefaults = DEFAULT_TEACHERS.filter(t => !existingNames.has(t.name));
+
+    if (missingDefaults.length > 0) {
+      console.log(`[AI Teachers] Auto-seeding ${missingDefaults.length} missing default teachers for org ${organizationId}`);
       const createdTeachers = await Promise.all(
-        DEFAULT_TEACHERS.map((teacher) =>
+        missingDefaults.map((teacher) =>
           prisma.aITeacher.create({
             data: {
               ...teacher,
@@ -406,7 +410,8 @@ router.get('/', async (req: Request, res: Response) => {
           })
         )
       );
-      teachers = createdTeachers;
+      // Merge with existing teachers and re-sort
+      teachers = [...teachers, ...createdTeachers].sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
     // Count trainees for each teacher (including legacy assignedTeacher field)
@@ -478,6 +483,58 @@ router.post('/seed', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error seeding teachers:', error);
     res.status(500).json({ error: 'Failed to seed teachers' });
+  }
+});
+
+// POST /api/admin/ai-teachers/seed-missing - Add missing default teachers (doesn't overwrite existing)
+router.post('/seed-missing', async (req: Request, res: Response) => {
+  try {
+    const prisma = container.resolve<PrismaClient>('PrismaClient');
+    const organizationId = await getOrganizationId(req);
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization context required' });
+    }
+
+    // Get existing teacher names for this org
+    const existingTeachers = await prisma.aITeacher.findMany({
+      where: { organizationId },
+      select: { name: true },
+    });
+    const existingNames = new Set(existingTeachers.map(t => t.name));
+
+    // Find missing default teachers
+    const missingTeachers = DEFAULT_TEACHERS.filter(t => !existingNames.has(t.name));
+
+    if (missingTeachers.length === 0) {
+      return res.json({
+        message: 'All default teachers already exist',
+        createdCount: 0,
+        existingCount: existingTeachers.length
+      });
+    }
+
+    // Create missing teachers
+    const createdTeachers = await Promise.all(
+      missingTeachers.map((teacher) =>
+        prisma.aITeacher.create({
+          data: {
+            ...teacher,
+            organizationId,
+          },
+        })
+      )
+    );
+
+    res.status(201).json({
+      message: `${createdTeachers.length} missing teachers added`,
+      createdCount: createdTeachers.length,
+      createdNames: createdTeachers.map(t => t.name),
+      existingCount: existingTeachers.length
+    });
+  } catch (error) {
+    console.error('Error seeding missing teachers:', error);
+    res.status(500).json({ error: 'Failed to seed missing teachers' });
   }
 });
 

@@ -2293,6 +2293,104 @@ Mix between multiple choice (4 options) and true/false questions. Focus on pract
   }
 
   // ============================================================================
+  // AUDIO-ONLY SUMMARY
+  // ============================================================================
+
+  /**
+   * Generate a simple audio-only summary (no slides, no video)
+   * Returns text content and audio base64 for direct chat playback
+   */
+  async generateAudioSummary(
+    traineeId: string,
+    topic: string,
+    focusAreas: string[],
+    language: 'ar' | 'en',
+    organizationId?: string
+  ): Promise<{
+    title: string;
+    text: string;
+    audioBase64: string;
+    durationSeconds: number;
+  }> {
+    const isArabic = language === 'ar';
+
+    // Get trainee profile for personalization
+    const profile = await this.getOrCreateProfile(traineeId);
+
+    // Combine focus areas with trainee weaknesses
+    const allFocusAreas = [
+      ...focusAreas,
+      ...profile.weaknesses,
+    ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5);
+
+    // Generate summary text using Gemini
+    const prompt = isArabic
+      ? `أنت خبير عقاري سعودي. أنشئ ملخصاً صوتياً مختصراً (1-2 دقيقة) عن "${topic}".
+
+${allFocusAreas.length > 0 ? `ركز على هذه النقاط المهمة للمتدرب: ${allFocusAreas.join('، ')}` : ''}
+
+الملخص يجب أن يكون:
+1. مباشر وعملي
+2. يتضمن نصائح قابلة للتطبيق
+3. بأسلوب محادثة طبيعي (كأنك تتحدث للمتدرب)
+4. يذكر الأنظمة السعودية إن أمكن
+
+أجب بالنص فقط بدون أي تنسيق أو عناوين - فقط النص المراد تحويله لصوت.`
+      : `You are a Saudi real estate expert. Create a brief audio summary (1-2 minutes) about "${topic}".
+
+${allFocusAreas.length > 0 ? `Focus on these important points for the trainee: ${allFocusAreas.join(', ')}` : ''}
+
+The summary should be:
+1. Direct and practical
+2. Include actionable tips
+3. Conversational style (as if speaking to the trainee)
+4. Reference Saudi regulations where applicable
+
+Reply with the text only, no formatting or headers - just the text to be converted to audio.`;
+
+    let summaryText = '';
+    try {
+      summaryText = await this.fallbackProvider.complete({
+        prompt,
+        maxTokens: 500,
+        temperature: 0.7,
+      });
+    } catch (error) {
+      console.error('[AITeacherService] Failed to generate summary text:', error);
+      summaryText = isArabic
+        ? `إليك ملخص سريع عن ${topic}. هذا الموضوع مهم جداً في مجال العقارات السعودي. ننصحك بالتعمق فيه أكثر من خلال الدورات المتاحة في المنصة.`
+        : `Here's a quick summary about ${topic}. This topic is very important in Saudi real estate. We recommend diving deeper through the courses available on the platform.`;
+    }
+
+    // Clean up the text
+    summaryText = summaryText.trim();
+
+    // Generate audio using ElevenLabs
+    let audioBase64 = '';
+    let durationSeconds = 0;
+
+    if (this.elevenLabsApiKey && summaryText.length > 0) {
+      try {
+        audioBase64 = await this.textToSpeech(summaryText, language, undefined, undefined, organizationId);
+        // Estimate duration: ~150 words per minute for Arabic, ~180 for English
+        const wordCount = summaryText.split(/\s+/).length;
+        durationSeconds = Math.round((wordCount / (isArabic ? 150 : 180)) * 60);
+      } catch (error) {
+        console.error('[AITeacherService] Failed to generate audio:', error);
+      }
+    }
+
+    const title = isArabic ? `ملخص صوتي: ${topic}` : `Audio Summary: ${topic}`;
+
+    return {
+      title,
+      text: summaryText,
+      audioBase64,
+      durationSeconds: durationSeconds || 60, // Default 1 minute if calculation fails
+    };
+  }
+
+  // ============================================================================
   // TEACHER INFO
   // ============================================================================
 

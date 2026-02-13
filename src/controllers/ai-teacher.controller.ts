@@ -228,11 +228,18 @@ export class AITeacherController {
       this.generateAVLecture.bind(this)
     );
 
-    // Generate audio summary
+    // Generate audio summary (AV with slides - legacy)
     this.router.post(
       '/av/generate-summary',
       authMiddleware(['trainee', 'trainer', 'org_admin']),
       this.generateAVSummary.bind(this)
+    );
+
+    // Generate audio-only summary (simple audio for chat)
+    this.router.post(
+      '/audio-summary',
+      authMiddleware(['trainee', 'trainer', 'org_admin']),
+      this.generateAudioSummary.bind(this)
     );
 
     // Get specific AV content with slides
@@ -884,6 +891,43 @@ export class AITeacherController {
       await this.avContentService.deleteContent(contentId, traineeId);
       res.status(200).json({ success: true });
     } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Generate audio-only summary (simple TTS without slides)
+   * Returns audio base64 for direct playback in chat
+   * POST /api/ai-teacher/audio-summary
+   */
+  private async generateAudioSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const traineeId = req.user!.userId;
+      const { topic, focusAreas, language } = req.body;
+      const organizationId = req.user?.organizationId ?? undefined;
+
+      if (!topic || typeof topic !== 'string') {
+        res.status(400).json({ error: 'Topic is required' });
+        return;
+      }
+
+      console.log('[AITeacherController] Generating audio summary:', {
+        traineeId,
+        topic,
+        language,
+      });
+
+      const result = await this.aiTeacherService.generateAudioSummary(
+        traineeId,
+        topic,
+        focusAreas || [],
+        language || 'ar',
+        organizationId
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('[AITeacherController] Generate audio summary error:', error);
       next(error);
     }
   }

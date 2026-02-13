@@ -495,20 +495,20 @@ ${sessionNotesSection}
    */
   private async getCoursesContext(traineeId: string, isArabic: boolean): Promise<string> {
     try {
-      // Get trainee's organizationId and completed lectures
+      // Get trainee's organizationId
       const trainee = await this.prisma.trainee.findUnique({
         where: { id: traineeId },
-        select: {
-          organizationId: true,
-          lectureCompletions: {
-            select: { lectureId: true, completedAt: true }
-          }
-        },
+        select: { organizationId: true },
       });
 
       if (!trainee?.organizationId) return '';
 
-      const completedLectureIds = new Set(trainee.lectureCompletions.map(lc => lc.lectureId));
+      // Get completed lectures separately
+      const lectureCompletions = await this.prisma.lectureCompletion.findMany({
+        where: { traineeId },
+        select: { lectureId: true },
+      });
+      const completedLectureIds = new Set(lectureCompletions.map(lc => lc.lectureId));
 
       // Get published courses for this organization with full details
       const courses = await this.prisma.course.findMany({
@@ -752,17 +752,15 @@ ${coursesList}`;
           difficultyLevel: true,
           status: true,
           outcome: true,
+          metrics: true,
           createdAt: true,
-          evaluations: {
-            select: { category: true, score: true }
-          }
         },
       });
       if (simSessions.length > 0) {
         const simText = simSessions.map(s => {
-          const avgScore = s.evaluations.length > 0
-            ? Math.round(s.evaluations.reduce((sum, e) => sum + e.score, 0) / s.evaluations.length)
-            : null;
+          // Parse metrics if available to get scores
+          const metrics = this.safeJsonParse(s.metrics, null);
+          const avgScore = metrics?.overallScore ?? null;
           return `- ${s.scenarioType} (${s.difficultyLevel}) | النتيجة: ${s.outcome ?? 'لم تكتمل'} | المعدل: ${avgScore ?? 'N/A'}% | ${s.createdAt.toLocaleDateString('ar-SA')}`;
         }).join('\n');
         sections.push(`## جلسات المحاكاة النصية:\n${simText}`);
@@ -789,9 +787,10 @@ ${coursesList}`;
         select: { date: true, overallScore: true, level: true, skillScores: true, strengths: true, weaknesses: true },
       });
       if (latestDiagnostic) {
-        const skills = this.safeJsonParse(latestDiagnostic.skillScores as string, {});
-        const strengths = this.safeJsonParse(latestDiagnostic.strengths as string, []);
-        const weaknesses = this.safeJsonParse(latestDiagnostic.weaknesses as string, []);
+        const skills = this.safeJsonParse(latestDiagnostic.skillScores, {});
+        // strengths and weaknesses are already string arrays
+        const strengths = latestDiagnostic.strengths || [];
+        const weaknesses = latestDiagnostic.weaknesses || [];
 
         let diagText = `- التاريخ: ${latestDiagnostic.date.toLocaleDateString('ar-SA')}
 - المستوى العام: ${latestDiagnostic.level} (${latestDiagnostic.overallScore}%)`;

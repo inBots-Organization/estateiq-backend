@@ -416,6 +416,33 @@ router.get('/', async (req: Request, res: Response) => {
       teachers = [...teachers, ...createdTeachers].sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
+    // Auto-sync avatars for default teachers with old DiceBear URLs
+    const defaultTeacherMap = new Map(DEFAULT_TEACHERS.map(t => [t.name, t.avatarUrl]));
+    const teachersToSync = await prisma.aITeacher.findMany({
+      where: {
+        organizationId,
+        isDefault: true,
+        avatarUrl: { contains: 'dicebear' },
+      },
+      select: { id: true, name: true },
+    });
+
+    if (teachersToSync.length > 0) {
+      console.log(`[AI Teachers] Auto-syncing ${teachersToSync.length} avatars to static images for org ${organizationId}`);
+      await Promise.all(
+        teachersToSync.map((teacher) => {
+          const newAvatarUrl = defaultTeacherMap.get(teacher.name);
+          if (newAvatarUrl) {
+            return prisma.aITeacher.update({
+              where: { id: teacher.id },
+              data: { avatarUrl: newAvatarUrl },
+            });
+          }
+          return Promise.resolve();
+        })
+      );
+    }
+
     // Count trainees for each teacher (including legacy assignedTeacher field)
     const teachersWithCounts = await Promise.all(
       teachers.map(async (teacher) => {

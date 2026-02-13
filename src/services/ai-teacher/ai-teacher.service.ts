@@ -2323,30 +2323,35 @@ Mix between multiple choice (4 options) and true/false questions. Focus on pract
       ...profile.weaknesses,
     ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5);
 
+    // Get trainee name for personalization
+    const traineeName = profile.firstName || '';
+
     // Generate summary text using Gemini
     const prompt = isArabic
-      ? `أنت خبير عقاري سعودي. أنشئ ملخصاً صوتياً مختصراً (1-2 دقيقة) عن "${topic}".
+      ? `أنت خبير عقاري سعودي اسمك "أحمد". أنشئ ملخصاً صوتياً مختصراً (1-2 دقيقة) عن "${topic}" للمتدرب "${traineeName}".
 
 ${allFocusAreas.length > 0 ? `ركز على هذه النقاط المهمة للمتدرب: ${allFocusAreas.join('، ')}` : ''}
 
 الملخص يجب أن يكون:
-1. مباشر وعملي
+1. مباشر وعملي - ابدأ مباشرة بالمحتوى
 2. يتضمن نصائح قابلة للتطبيق
-3. بأسلوب محادثة طبيعي (كأنك تتحدث للمتدرب)
+3. بأسلوب محادثة طبيعي باللهجة السعودية
 4. يذكر الأنظمة السعودية إن أمكن
+5. لا تستخدم أي متغيرات أو أقواس مربعة - اذكر اسم المتدرب "${traineeName}" مباشرة إذا أردت مخاطبته
 
-أجب بالنص فقط بدون أي تنسيق أو عناوين - فقط النص المراد تحويله لصوت.`
-      : `You are a Saudi real estate expert. Create a brief audio summary (1-2 minutes) about "${topic}".
+مهم جداً: أجب بالنص الصوتي فقط بدون أي تنسيق أو عناوين أو نجوم أو markdown - فقط النص الذي سيُقرأ صوتياً.`
+      : `You are a Saudi real estate expert named "Ahmed". Create a brief audio summary (1-2 minutes) about "${topic}" for trainee "${traineeName}".
 
 ${allFocusAreas.length > 0 ? `Focus on these important points for the trainee: ${allFocusAreas.join(', ')}` : ''}
 
 The summary should be:
-1. Direct and practical
+1. Direct and practical - start with the content immediately
 2. Include actionable tips
-3. Conversational style (as if speaking to the trainee)
+3. Conversational style
 4. Reference Saudi regulations where applicable
+5. Do not use any variables or square brackets - mention the trainee name "${traineeName}" directly if you want to address them
 
-Reply with the text only, no formatting or headers - just the text to be converted to audio.`;
+IMPORTANT: Reply with the spoken text only, no formatting, headers, asterisks or markdown - just the text that will be read aloud.`;
 
     let summaryText = '';
     try {

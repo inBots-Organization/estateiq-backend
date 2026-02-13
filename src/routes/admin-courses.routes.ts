@@ -13,8 +13,8 @@ import multer from 'multer';
 
 const router = Router();
 
-// All admin courses routes require authentication with admin role
-router.use(authMiddleware(['admin', 'org_admin']));
+// All admin courses routes require authentication with admin/trainer role
+router.use(authMiddleware(['admin', 'org_admin', 'trainer']));
 
 // Configure multer for file uploads (PDF, images)
 // Note: For MVP, files are stored as base64 in database

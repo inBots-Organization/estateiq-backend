@@ -334,17 +334,17 @@ export class SuperAdminService implements ISuperAdminService {
     // Delete in correct order to handle foreign key constraints
     // Use transaction for atomic deletion
     await prisma.$transaction(async (tx) => {
-      // 1. Delete chat messages
-      const chatMessages = await tx.chatMessage.deleteMany({
-        where: { traineeId: { in: traineeIds } },
-      });
-      deletedCounts.chatMessages = chatMessages.count;
-
-      // 2. Delete simulation messages
-      const simMessages = await tx.simulationMessage.deleteMany({
+      // 1. Delete conversation turns (simulation messages)
+      const conversationTurns = await tx.conversationTurn.deleteMany({
         where: { session: { traineeId: { in: traineeIds } } },
       });
-      deletedCounts.simulationMessages = simMessages.count;
+      deletedCounts.conversationTurns = conversationTurns.count;
+
+      // 2. Delete interaction reports
+      const interactionReports = await tx.interactionReport.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.interactionReports = interactionReports.count;
 
       // 3. Delete simulation sessions
       const simSessions = await tx.simulationSession.deleteMany({
@@ -358,67 +358,144 @@ export class SuperAdminService implements ISuperAdminService {
       });
       deletedCounts.voiceSessions = voiceSessions.count;
 
-      // 5. Delete trainee AI teacher assignments
-      const teacherAssignments = await tx.trainee.updateMany({
+      // 5. Delete diagnostic sessions
+      const diagnosticSessions = await tx.diagnosticSession.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.diagnosticSessions = diagnosticSessions.count;
+
+      // 6. Delete daily skill reports
+      const skillReports = await tx.dailySkillReport.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.skillReports = skillReports.count;
+
+      // 7. Delete quiz responses and attempts
+      const quizResponses = await tx.quizResponse.deleteMany({
+        where: { attempt: { traineeId: { in: traineeIds } } },
+      });
+      deletedCounts.quizResponses = quizResponses.count;
+
+      const quizAttempts = await tx.quizAttempt.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.quizAttempts = quizAttempts.count;
+
+      // 8. Delete card proficiencies
+      const cardProficiencies = await tx.cardProficiency.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.cardProficiencies = cardProficiencies.count;
+
+      // 9. Delete trainee AI teacher assignments
+      await tx.trainee.updateMany({
         where: { id: { in: traineeIds } },
         data: { assignedTeacherId: null },
       });
 
-      // 6. Delete AI teacher documents
-      const teacherDocs = await tx.aITeacherDocument.deleteMany({
-        where: { teacher: { organizationId: orgId } },
-      });
-      deletedCounts.aiTeacherDocuments = teacherDocs.count;
-
-      // 7. Delete AI teachers
-      const teachers = await tx.aITeacher.deleteMany({
-        where: { organizationId: orgId },
-      });
-      deletedCounts.aiTeachers = teachers.count;
-
-      // 8. Delete group memberships
-      const groupMemberships = await tx.groupMembership.deleteMany({
-        where: { trainee: { organizationId: orgId } },
-      });
-      deletedCounts.groupMemberships = groupMemberships.count;
-
-      // 9. Delete groups
-      const groups = await tx.group.deleteMany({
-        where: { organizationId: orgId },
-      });
-      deletedCounts.groups = groups.count;
-
-      // 10. Delete API usage records
-      const apiUsage = await tx.apiUsage.deleteMany({
-        where: { organizationId: orgId },
-      });
-      deletedCounts.apiUsage = apiUsage.count;
-
-      // 11. Delete subscription
-      const subscription = await tx.subscription.deleteMany({
-        where: { organizationId: orgId },
-      });
-      deletedCounts.subscriptions = subscription.count;
-
-      // 12. Delete brain document chunks
-      const brainChunks = await tx.brainDocumentChunk.deleteMany({
+      // 10. Delete brain document chunks (teacher-specific docs)
+      const brainChunks = await tx.brainChunk.deleteMany({
         where: { document: { organizationId: orgId } },
       });
       deletedCounts.brainChunks = brainChunks.count;
 
-      // 13. Delete brain documents
+      // 11. Delete brain documents (includes AI teacher documents)
       const brainDocs = await tx.brainDocument.deleteMany({
         where: { organizationId: orgId },
       });
       deletedCounts.brainDocuments = brainDocs.count;
 
-      // 14. Delete trainees (users)
+      // 12. Delete AI teachers
+      const teachers = await tx.aITeacher.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.aiTeachers = teachers.count;
+
+      // 13. Delete trainee notes
+      const traineeNotes = await tx.traineeNote.deleteMany({
+        where: { OR: [{ authorId: { in: traineeIds } }, { traineeId: { in: traineeIds } }] },
+      });
+      deletedCounts.traineeNotes = traineeNotes.count;
+
+      // 14. Delete notifications
+      const notifications = await tx.notification.deleteMany({
+        where: { recipientId: { in: traineeIds } },
+      });
+      deletedCounts.notifications = notifications.count;
+
+      // 15. Delete program enrollments
+      const enrollments = await tx.programEnrollment.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.enrollments = enrollments.count;
+
+      // 16. Delete lecture completions
+      const lectureCompletions = await tx.lectureCompletion.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.lectureCompletions = lectureCompletions.count;
+
+      // 17. Delete assessment completions
+      const assessmentCompletions = await tx.assessmentCompletion.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.assessmentCompletions = assessmentCompletions.count;
+
+      // 18. Delete trainer group assignments
+      const trainerAssignments = await tx.trainerGroupAssignment.deleteMany({
+        where: { trainerId: { in: traineeIds } },
+      });
+      deletedCounts.trainerAssignments = trainerAssignments.count;
+
+      // 19. Delete group memberships
+      const groupMembers = await tx.groupMember.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.groupMembers = groupMembers.count;
+
+      // 20. Delete groups (trainee groups)
+      const groups = await tx.traineeGroup.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.groups = groups.count;
+
+      // 21. Delete API usage records
+      const apiUsage = await tx.apiUsage.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.apiUsage = apiUsage.count;
+
+      // 22. Delete subscription
+      const subscription = await tx.subscription.deleteMany({
+        where: { organizationId: orgId },
+      });
+      deletedCounts.subscriptions = subscription.count;
+
+      // 23. Delete AV feedback
+      const avFeedback = await tx.aVFeedback.deleteMany({
+        where: { content: { traineeId: { in: traineeIds } } },
+      });
+      deletedCounts.avFeedback = avFeedback.count;
+
+      // 24. Delete AV slides
+      const avSlides = await tx.aVSlide.deleteMany({
+        where: { content: { traineeId: { in: traineeIds } } },
+      });
+      deletedCounts.avSlides = avSlides.count;
+
+      // 25. Delete AV content
+      const avContent = await tx.aVContent.deleteMany({
+        where: { traineeId: { in: traineeIds } },
+      });
+      deletedCounts.avContent = avContent.count;
+
+      // 26. Delete trainees (users)
       const trainees = await tx.trainee.deleteMany({
         where: { organizationId: orgId },
       });
       deletedCounts.users = trainees.count;
 
-      // 15. Finally, delete the organization
+      // 27. Finally, delete the organization
       await tx.organization.delete({
         where: { id: orgId },
       });

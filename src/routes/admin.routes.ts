@@ -900,8 +900,16 @@ router.get('/trainee/:traineeId/reports', async (req: Request, res: Response) =>
     }
 
     // Verify trainee exists and is in the same organization
+    // Support lookup by ID or email
     const trainee = await prisma.trainee.findFirst({
-      where: { id: traineeId, organizationId },
+      where: {
+        organizationId,
+        OR: [
+          { id: traineeId },
+          { email: traineeId },
+          { email: { contains: traineeId } },
+        ],
+      },
     });
 
     if (!trainee) {
